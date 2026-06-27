@@ -4,8 +4,10 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: Codemagic Key  Admin   # ← entegrasyonun gerçek ADI
+      app_store_connect: Codemagic Key  Admin
     environment:
+      groups:
+        - signing
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -17,7 +19,7 @@ workflows:
       - name: Imzalama (sertifika + profil olustur)
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.kaan.fitwalk" --type IOS_APP_STORE --create
+          app-store-connect fetch-signing-files "com.kaan.fitwalk" --type IOS_APP_STORE --certificate-key @env:CERTIFICATE_PRIVATE_KEY --create
           keychain add-certificates
           xcode-project use-profiles
       - name: Flutter build ipa
