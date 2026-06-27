@@ -4,11 +4,8 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: Codemagic Key  Admin   # ← entegrasyonun ADI
+      app_store_connect: Codemagic Key  Admin   # ← entegrasyonun gerçek ADI
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.kaan.fitwalk
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -17,6 +14,12 @@ workflows:
         script: flutter pub get
       - name: Isar kod uretimi (build_runner)
         script: dart run build_runner build --delete-conflicting-outputs
+      - name: Imzalama (sertifika + profil olustur)
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "com.kaan.fitwalk" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Flutter build ipa
         script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
