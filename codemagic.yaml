@@ -12,6 +12,8 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: SwiftPM kapat (CocoaPods kullan)
+        script: flutter config --no-enable-swift-package-manager
       - name: Flutter pub get
         script: flutter pub get
       - name: Isar kod uretimi (build_runner)
