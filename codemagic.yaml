@@ -1,0 +1,32 @@
+workflows:
+  ios-testflight:
+    name: FitWalk iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: U25JBZ895H
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.kaan.fitwalk
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Isar kod uretimi (build_runner)
+        script: dart run build_runner build --delete-conflicting-outputs
+      - name: Pod install
+        script: |
+          cd ios && pod install
+      - name: Kod imzalama profillerini kur
+        script: xcode-project use-profiles
+      - name: Flutter build ipa
+        script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
