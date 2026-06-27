@@ -4,13 +4,13 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: Codemagic Key   # ← Codemagic'teki entegrasyon ADI
+      app_store_connect: Codemagic Key Admin   # ← Codemagic'teki entegrasyon ADI
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Flutter pub get
+      - name: Flutter pub get 
         script: flutter pub get
       - name: Isar kod uretimi (build_runner)
         script: dart run build_runner build --delete-conflicting-outputs
