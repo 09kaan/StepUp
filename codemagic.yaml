@@ -4,7 +4,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: Codemagic Key
+      app_store_connect: Codemagic Key   # ← Codemagic'teki entegrasyon ADI
     environment:
       flutter: stable
       xcode: latest
@@ -14,9 +14,6 @@ workflows:
         script: flutter pub get
       - name: Isar kod uretimi (build_runner)
         script: dart run build_runner build --delete-conflicting-outputs
-      - name: Pod install
-        script: |
-          cd ios && pod install
       - name: Imzalama dosyalarini olustur ve indir
         script: |
           keychain initialize
