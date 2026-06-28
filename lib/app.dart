@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'features/challenges/challenges_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/profile/profile_screen.dart';
 import 'features/walk/walk_tracking_screen.dart';
 
 class FitWalkApp extends StatelessWidget {
@@ -34,7 +35,7 @@ class _RootScreenState extends State<RootScreen> {
     DashboardScreen(),
     WalkTrackingScreen(),
     ChallengesScreen(),
-    Center(child: Text('Profil (yakında)')),
+    ProfileScreen(),
   ];
 
   @override
