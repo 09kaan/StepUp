@@ -7,6 +7,7 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../theme/app_theme.dart';
 import '../dashboard/dashboard_controller.dart'; // streakProvider
+import '../stats/stats_screen.dart';
 import 'profile_controller.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -19,7 +20,18 @@ class ProfileScreen extends ConsumerWidget {
     final badgesAsync = ref.watch(badgesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(
+        title: const Text('Profil'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: 'İstatistikler',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const StatsScreen()),
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(profileStatsProvider);
