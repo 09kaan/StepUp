@@ -16,6 +16,9 @@ class DailyActivity {
   double activeCalories = 0;
   int goalSteps = 6000;
   bool goalReached = false;
+  
+  // YENİ: bu gün telafi (freeze) ile korundu mu?
+  bool streakProtected = false;
 
   DailyActivity();
 
@@ -26,5 +29,6 @@ class DailyActivity {
     this.activeCalories = 0,
     this.goalSteps = 6000,
     this.goalReached = false,
+    this.streakProtected = false,
   });
 }

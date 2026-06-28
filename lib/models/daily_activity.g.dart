@@ -46,6 +46,11 @@ const DailyActivitySchema = CollectionSchema(
       id: 5,
       name: r'steps',
       type: IsarType.long,
+    ),
+    r'streakProtected': PropertySchema(
+      id: 6,
+      name: r'streakProtected',
+      type: IsarType.bool,
     )
   },
   estimateSize: _dailyActivityEstimateSize,
@@ -97,6 +102,7 @@ void _dailyActivitySerialize(
   writer.writeBool(offsets[3], object.goalReached);
   writer.writeLong(offsets[4], object.goalSteps);
   writer.writeLong(offsets[5], object.steps);
+  writer.writeBool(offsets[6], object.streakProtected);
 }
 
 DailyActivity _dailyActivityDeserialize(
@@ -113,6 +119,7 @@ DailyActivity _dailyActivityDeserialize(
   object.goalSteps = reader.readLong(offsets[4]);
   object.id = id;
   object.steps = reader.readLong(offsets[5]);
+  object.streakProtected = reader.readBool(offsets[6]);
   return object;
 }
 
@@ -135,6 +142,8 @@ P _dailyActivityDeserializeProp<P>(
       return (reader.readLong(offset)) as P;
     case 5:
       return (reader.readLong(offset)) as P;
+    case 6:
+      return (reader.readBool(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -751,6 +760,16 @@ extension DailyActivityQueryFilter
       ));
     });
   }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterFilterCondition>
+      streakProtectedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'streakProtected',
+        value: value,
+      ));
+    });
+  }
 }
 
 extension DailyActivityQueryObject
@@ -836,6 +855,20 @@ extension DailyActivityQuerySortBy
   QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy> sortByStepsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'steps', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      sortByStreakProtected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'streakProtected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      sortByStreakProtectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'streakProtected', Sort.desc);
     });
   }
 }
@@ -931,6 +964,20 @@ extension DailyActivityQuerySortThenBy
       return query.addSortBy(r'steps', Sort.desc);
     });
   }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      thenByStreakProtected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'streakProtected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      thenByStreakProtectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'streakProtected', Sort.desc);
+    });
+  }
 }
 
 extension DailyActivityQueryWhereDistinct
@@ -971,6 +1018,13 @@ extension DailyActivityQueryWhereDistinct
   QueryBuilder<DailyActivity, DailyActivity, QDistinct> distinctBySteps() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'steps');
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QDistinct>
+      distinctByStreakProtected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'streakProtected');
     });
   }
 }
@@ -1018,6 +1072,13 @@ extension DailyActivityQueryProperty
   QueryBuilder<DailyActivity, int, QQueryOperations> stepsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'steps');
+    });
+  }
+
+  QueryBuilder<DailyActivity, bool, QQueryOperations>
+      streakProtectedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'streakProtected');
     });
   }
 }

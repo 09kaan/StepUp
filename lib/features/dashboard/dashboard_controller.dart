@@ -4,6 +4,7 @@ import '../../models/daily_activity.dart';
 import '../../services/daily_activity_repository.dart';
 import '../../services/health_service.dart';
 import '../../services/step_service.dart';
+import '../../services/streak_service.dart';
 
 // --- Adım 2: canlı sensör (yürüyor/duruyor rozeti) ---
 final stepServiceProvider = Provider<StepService>((ref) => StepService());
@@ -39,4 +40,14 @@ final todayActivityProvider = FutureProvider<DailyActivity>((ref) async {
   final summary = await health.getTodaySummary();
   final repo = ref.watch(dailyActivityRepoProvider);
   return repo.upsertToday(summary);
+});
+
+final streakServiceProvider = Provider((ref) => StreakService());
+
+final streakProvider = FutureProvider<StreakInfo>((ref) async {
+  // Önce bugünü tazele ki seri güncel olsun
+  await ref.watch(todayActivityProvider.future);
+  final repo = ref.watch(dailyActivityRepoProvider);
+  final days = await repo.recentDays(365);
+  return ref.watch(streakServiceProvider).compute(days);
 });

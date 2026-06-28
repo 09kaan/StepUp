@@ -47,4 +47,17 @@ class DailyActivityRepository {
         .sortByDate()
         .findAll();
   }
+  /// Bir günü telafi (freeze) ile korur/iptal eder.
+  Future<void> setProtected(DateTime day, bool protected) async {
+    final key = _dayKey(day);
+    await isar.writeTxn(() async {
+      final rec = await isar.dailyActivitys
+          .filter()
+          .dateEqualTo(key)
+          .findFirst() ??
+          DailyActivity.create(date: key, goalSteps: 6000);
+      rec.streakProtected = protected;
+      await isar.dailyActivitys.put(rec);
+    });
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/streak_service.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -12,6 +13,7 @@ class DashboardScreen extends ConsumerWidget {
 
     final todayAsync = ref.watch(todayActivityProvider);
     final statusAsync = ref.watch(pedestrianStatusProvider);
+    final streakAsync = ref.watch(streakProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Bugün')),
@@ -42,6 +44,19 @@ class DashboardScreen extends ConsumerWidget {
                   style: TextStyle(color: scheme.error),
                 ),
               ),
+            ),
+            const SizedBox(height: 24),
+            streakAsync.when(
+              data: (s) => _StreakCard(
+                info: s,
+                onUseFreeze: () async {
+                  final repo = ref.read(dailyActivityRepoProvider);
+                  await repo.setProtected(DateTime.now(), true);
+                  ref.invalidate(streakProvider);
+                },
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 24),
             Center(
@@ -159,6 +174,84 @@ class _Stat extends StatelessWidget {
           style: Theme.of(context)
               .textTheme
               .titleMedium
+              ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _StreakCard extends StatelessWidget {
+  final StreakInfo info;
+  final Future<void> Function() onUseFreeze;
+
+  const _StreakCard({required this.info, required this.onUseFreeze});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _StreakStat(
+                  emoji: '🔥',
+                  value: '${info.current}',
+                  label: 'Güncel seri',
+                ),
+                _StreakStat(
+                  emoji: '🏆',
+                  value: '${info.longest}',
+                  label: 'En uzun',
+                ),
+                _StreakStat(
+                  emoji: '🧊',
+                  value: '${info.freezeAvailable}',
+                  label: 'Telafi hakkı',
+                ),
+              ],
+            ),
+            if (info.freezeAvailable > 0) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onUseFreeze,
+                icon: const Icon(Icons.ac_unit),
+                label: const Text('Bugünü telafi günü yap'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakStat extends StatelessWidget {
+  final String emoji;
+  final String value;
+  final String label;
+
+  const _StreakStat({
+    required this.emoji,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 24)),
+        Text(
+          value,
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
