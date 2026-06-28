@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'walk_tracking_controller.dart';
 import 'walk_detail_screen.dart';
+import '../../main.dart'; // isarProvider
+import '../../models/walk_session.dart';
+import '../../theme/app_theme.dart';
 
 class WalkHistoryScreen extends ConsumerWidget {
   const WalkHistoryScreen({super.key});
@@ -42,11 +45,49 @@ class WalkHistoryScreen extends ConsumerWidget {
                     builder: (_) => WalkDetailScreen(session: s),
                   ),
                 ),
+                onLongPress: () => _confirmDeleteWalk(context, ref, s),
               );
             },
           );
         },
       ),
+    );
+  }
+}
+
+Future<void> _confirmDeleteWalk(
+  BuildContext context,
+  WidgetRef ref,
+  WalkSession session,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Yürüyüşü sil'),
+      content: const Text(
+        'Bu yürüyüş kaydı kalıcı olarak silinecek. Emin misin?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Sil'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  final isar = ref.read(isarProvider);
+  await isar.writeTxn(() => isar.walkSessions.delete(session.id));
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Yürüyüş silindi')),
     );
   }
 }
