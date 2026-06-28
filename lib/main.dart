@@ -5,7 +5,9 @@ import 'package:path_provider/path_provider.dart';
 
 import 'services/notification_service.dart';
 import 'app.dart';
+import 'models/app_settings.dart';
 import 'models/challenge.dart';
+import 'models/challenge_template.dart';
 import 'models/daily_activity.dart';
 import 'models/walk_session.dart';
 
@@ -19,7 +21,13 @@ Future<void> main() async {
 
   final dir = await getApplicationDocumentsDirectory();
   final isar = await Isar.open(
-    [DailyActivitySchema, WalkSessionSchema, ChallengeSchema],
+    [
+      DailyActivitySchema,
+      WalkSessionSchema,
+      ChallengeSchema,
+      ChallengeTemplateSchema,
+      AppSettingSchema,
+    ],
     directory: dir.path,
   );
 

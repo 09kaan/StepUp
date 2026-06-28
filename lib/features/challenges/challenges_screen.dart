@@ -6,6 +6,7 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../theme/app_theme.dart';
 import 'challenge_controller.dart';
+import 'edit_challenges_screen.dart';
 
 String _unitLabel(ChallengeUnit u) {
   switch (u) {
@@ -35,7 +36,18 @@ class ChallengesScreen extends ConsumerWidget {
     final asyncList = ref.watch(todayChallengesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Günlük Görevler')),
+      appBar: AppBar(
+        title: const Text('Günlük Görevler'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Görevleri düzenle',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const EditChallengesScreen()),
+            ),
+          ),
+        ],
+      ),
       body: asyncList.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Hata: $e')),

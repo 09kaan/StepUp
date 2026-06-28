@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:isar/isar.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../main.dart'; // isarProvider
@@ -128,3 +129,11 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 final walkTrackingControllerProvider =
     StateNotifierProvider<WalkTrackingController, WalkTrackingState>(
         (ref) => WalkTrackingController(ref));
+
+final walkHistoryProvider = StreamProvider<List<WalkSession>>((ref) {
+  final isar = ref.watch(isarProvider);
+  return isar.walkSessions
+      .where()
+      .watch(fireImmediately: true)
+      .map((list) => list..sort((a, b) => b.startTime.compareTo(a.startTime)));
+});

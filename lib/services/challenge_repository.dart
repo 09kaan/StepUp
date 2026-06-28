@@ -1,5 +1,7 @@
 import 'package:isar/isar.dart';
+
 import '../models/challenge.dart';
+import '../models/challenge_template.dart';
 
 class ChallengeRepository {
   final Isar isar;
@@ -11,6 +13,7 @@ class ChallengeRepository {
   /// Bugünün günlük görevleri yoksa varsayılanları oluşturur.
   Future<void> ensureTodayChallenges() async {
     final today = _dayKey(DateTime.now());
+
     final existing = await isar.challenges
         .filter()
         .typeEqualTo(ChallengeType.daily)
@@ -19,36 +22,59 @@ class ChallengeRepository {
 
     if (existing.isNotEmpty) return;
 
-    final defaults = [
-      Challenge.create(
-        title: '10 Şınav',
-        type: ChallengeType.daily,
-        unit: ChallengeUnit.reps,
-        goalValue: 10,
-        startDate: today,
-        verification: VerificationKind.manual,
-      ),
-      Challenge.create(
-        title: '10 Mekik',
-        type: ChallengeType.daily,
-        unit: ChallengeUnit.reps,
-        goalValue: 10,
-        startDate: today,
-        verification: VerificationKind.manual,
-      ),
-      Challenge.create(
-        title: '3 km Yürüyüş',
-        type: ChallengeType.daily,
-        unit: ChallengeUnit.km,
-        goalValue: 3,
-        startDate: today,
-        verification: VerificationKind.auto,
-      ),
-    ];
+    final templates = await isar.challengeTemplates
+        .filter()
+        .enabledEqualTo(true)
+        .findAll();
+
+    final toCreate = templates
+        .map((t) => Challenge.create(
+              title: t.title,
+              type: ChallengeType.daily,
+              unit: t.unit,
+              goalValue: t.goalValue,
+              startDate: today,
+              verification: t.verification,
+            ))
+        .toList();
+
+    if (toCreate.isEmpty) return;
 
     await isar.writeTxn(() async {
-      await isar.challenges.putAll(defaults);
+      await isar.challenges.putAll(toCreate);
     });
+  }
+
+  /// Bugünkü günlük görevleri silip şablonlardan yeniden üretir.
+  Future<void> regenerateToday() async {
+    final today = _dayKey(DateTime.now());
+
+    final existing = await isar.challenges
+        .filter()
+        .typeEqualTo(ChallengeType.daily)
+        .startDateEqualTo(today)
+        .findAll();
+
+    await isar.writeTxn(() async {
+      await isar.challenges.deleteAll(existing.map((c) => c.id).toList());
+    });
+
+    await ensureTodayChallenges();
+  }
+
+  /// Son [days] günde verilen başlıklı görevin kaç gün tamamlandığını sayar.
+  Future<int> completedCountLastDays(String title, int days) async {
+    final from = _dayKey(DateTime.now()).subtract(Duration(days: days - 1));
+
+    final list = await isar.challenges
+        .filter()
+        .typeEqualTo(ChallengeType.daily)
+        .titleEqualTo(title)
+        .isCompletedEqualTo(true)
+        .startDateGreaterThan(from, include: true)
+        .findAll();
+
+    return list.length;
   }
 
   Future<List<Challenge>> todayChallenges() {

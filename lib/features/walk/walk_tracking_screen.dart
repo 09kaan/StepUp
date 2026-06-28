@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import 'walk_history_screen.dart';
 import 'walk_tracking_controller.dart';
 
 class WalkTrackingScreen extends ConsumerWidget {
@@ -32,6 +33,15 @@ class WalkTrackingScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Yürüyüş Rotası'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Geçmiş',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const WalkHistoryScreen()),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
