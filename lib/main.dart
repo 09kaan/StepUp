@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'services/notification_service.dart';
 import 'app.dart';
 import 'models/challenge.dart';
 import 'models/daily_activity.dart';
@@ -18,9 +19,13 @@ Future<void> main() async {
 
   final dir = await getApplicationDocumentsDirectory();
   final isar = await Isar.open(
-    [ChallengeSchema, DailyActivitySchema, WalkSessionSchema],
+    [DailyActivitySchema, WalkSessionSchema, ChallengeSchema],
     directory: dir.path,
   );
+
+  await NotificationService.instance.init();
+  await NotificationService.instance.requestPermissions();
+  await NotificationService.instance.scheduleDailyReminder(hour: 19, minute: 0);
 
   runApp(
     ProviderScope(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../dashboard/dashboard_controller.dart'; // streakProvider
 import '../../services/badge_service.dart';
+import '../../services/notification_service.dart';
 import 'profile_controller.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -75,6 +76,18 @@ class ProfileScreen extends ConsumerWidget {
                 children: badges
                     .map((b) => _BadgeTile(badge: b))
                     .toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.notifications_active),
+              title: const Text('Günlük hatırlatma (19:00)'),
+              subtitle: const Text('Her akşam yürüyüş hatırlatması'),
+              trailing: TextButton(
+                onPressed: () async {
+                  await NotificationService.instance.showTestNow();
+                },
+                child: const Text('Test et'),
               ),
             ),
           ],
