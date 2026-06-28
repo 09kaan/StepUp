@@ -28,9 +28,9 @@ class LocationTrackingService {
   LocationSettings _settings() {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return AppleSettings(
-        accuracy: LocationAccuracy.best,
+        accuracy: LocationAccuracy.high,
         activityType: ActivityType.fitness,
-        distanceFilter: 5,
+        distanceFilter: 10,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
         allowBackgroundLocationUpdates: true,

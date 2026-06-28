@@ -1,13 +1,8 @@
+import 'package:apple_maps_flutter/apple_maps_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 
 import 'walk_tracking_controller.dart';
-
-// OSM tile şablonu. {z}/{x}/{y} flutter_map tarafından doldurulur.
-const String _osmTileUrl =
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 class WalkTrackingScreen extends ConsumerWidget {
   const WalkTrackingScreen({super.key});
@@ -24,44 +19,39 @@ class WalkTrackingScreen extends ConsumerWidget {
     final state = ref.watch(walkTrackingControllerProvider);
     final controller = ref.read(walkTrackingControllerProvider.notifier);
 
-    final center =
-        state.points.isNotEmpty ? state.points.last : const LatLng(41.0082, 28.9784);
+    // controller'daki latlong2 noktalarını Apple Maps LatLng'ine çevir
+    final mapPoints = state.points
+        .map((p) => LatLng(p.latitude, p.longitude))
+        .toList();
+
+    final center = mapPoints.isNotEmpty
+        ? mapPoints.last
+        : const LatLng(41.0082, 28.9784);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Yürüyüş Rotası')),
+      appBar: AppBar(
+        title: const Text('Yürüyüş Rotası'),
+      ),
       body: Column(
         children: [
           Expanded(
-            child: FlutterMap(
-              options: MapOptions(initialCenter: center, initialZoom: 16),
-              children: [
-                TileLayer(
-                  urlTemplate: _osmTileUrl,
-                  userAgentPackageName: 'com.kaan.fitwalk',
-                ),
-                if (state.points.length >= 2)
-                  PolylineLayer(
-                    polylines: [
+            child: AppleMap(
+              initialCameraPosition:
+                  CameraPosition(target: center, zoom: 16),
+              myLocationEnabled: true,
+              trackingMode: state.isTracking
+                  ? TrackingMode.follow
+                  : TrackingMode.none,
+              polylines: mapPoints.length >= 2
+                  ? {
                       Polyline(
-                        points: state.points,
-                        strokeWidth: 5,
+                        polylineId: PolylineId('route'),
+                        points: mapPoints,
                         color: Colors.blue,
+                        width: 5,
                       ),
-                    ],
-                  ),
-                if (state.points.isNotEmpty)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: state.points.last,
-                        width: 24,
-                        height: 24,
-                        child: const Icon(Icons.my_location,
-                            color: Colors.blue),
-                      ),
-                    ],
-                  ),
-              ],
+                    }
+                  : <Polyline>{},
             ),
           ),
           Padding(
