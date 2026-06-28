@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'walk_tracking_controller.dart';
+import 'walk_detail_screen.dart';
 
 class WalkHistoryScreen extends ConsumerWidget {
   const WalkHistoryScreen({super.key});
@@ -35,6 +36,12 @@ class WalkHistoryScreen extends ConsumerWidget {
                 leading: const Icon(Icons.directions_walk),
                 title: Text('$km km - $min dk'),
                 subtitle: Text(date),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => WalkDetailScreen(session: s),
+                  ),
+                ),
               );
             },
           );

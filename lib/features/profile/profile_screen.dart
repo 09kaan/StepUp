@@ -8,6 +8,7 @@ import '../../shared/widgets/section_header.dart';
 import '../../theme/app_theme.dart';
 import '../dashboard/dashboard_controller.dart'; // streakProvider
 import '../stats/stats_screen.dart';
+import '../records/records_screen.dart';
 import 'profile_controller.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -23,6 +24,13 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Profil'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.emoji_events),
+            tooltip: 'Kişisel Rekorlar',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RecordsScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: 'İstatistikler',
