@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'features/challenges/challenges_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/walk/walk_tracking_screen.dart';
 
@@ -32,7 +33,7 @@ class _RootScreenState extends State<RootScreen> {
   final _screens = const [
     DashboardScreen(),
     WalkTrackingScreen(),
-    Center(child: Text('Görevler (yakında)')),
+    ChallengesScreen(),
     Center(child: Text('Profil (yakında)')),
   ];
 
