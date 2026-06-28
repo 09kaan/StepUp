@@ -47,6 +47,8 @@
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Adım, mesafe ve kalori verini günlük hedef ve challenge'lar için okuyoruz.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>FitWalk, yürüyüş ve aktivite verilerinizi Apple Sağlık ile senkronize edebilmek için sağlık verilerinize erişir.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Canlı adım ve tempo takibi için hareket verini kullanıyoruz.</string>
 </dict>
