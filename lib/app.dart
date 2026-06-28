@@ -3,6 +3,7 @@ import 'features/challenges/challenges_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/walk/walk_tracking_screen.dart';
+import 'theme/app_theme.dart';
 
 class FitWalkApp extends StatelessWidget {
   const FitWalkApp({super.key});
@@ -12,10 +13,7 @@ class FitWalkApp extends StatelessWidget {
     return MaterialApp(
       title: 'FitWalk',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
       home: const RootScreen(),
     );
   }

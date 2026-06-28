@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../dashboard/dashboard_controller.dart'; // streakProvider
 import '../../services/badge_service.dart';
 import '../../services/notification_service.dart';
+import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/section_header.dart';
+import '../../theme/app_theme.dart';
+import '../dashboard/dashboard_controller.dart'; // streakProvider
 import 'profile_controller.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -23,48 +26,44 @@ class ProfileScreen extends ConsumerWidget {
           ref.invalidate(badgesProvider);
         },
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
           children: [
-            // İstatistikler
             statsAsync.when(
-              loading: () => const Center(
-                child: Padding(
+              loading: () => const Padding(
                   padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator())),
+                  child: Center(child: CircularProgressIndicator())),
               error: (e, _) => Text('İstatistik hatası: $e'),
               data: (s) {
                 final streak = streakAsync.asData?.value;
+                final items = [
+                  _StatData('Toplam mesafe',
+                      '${s.totalWalkKm.toStringAsFixed(1)} km', Icons.straighten),
+                  _StatData('Yürüyüş sayısı', '${s.walkCount}',
+                      Icons.directions_walk),
+                  _StatData('Toplam tırmanış',
+                      '${s.totalElevationMeters.toStringAsFixed(0)} m',
+                      Icons.terrain),
+                  _StatData('Tamamlanan görev', '${s.completedChallenges}',
+                      Icons.flag),
+                  _StatData('Güncel seri', '${streak?.current ?? 0} gün',
+                      Icons.local_fire_department),
+                  _StatData('En uzun seri', '${streak?.longest ?? 0} gün',
+                      Icons.emoji_events),
+                ];
+
                 return GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 1.6,
-                  children: [
-                    _StatTile(
-                      label: 'Toplam mesafe',
-                      value: '${s.totalWalkKm.toStringAsFixed(1)} km'),
-                    _StatTile(
-                      label: 'Yürüyüş sayısı',
-                      value: '${s.walkCount}'),
-                    _StatTile(
-                      label: 'Toplam tırmanış',
-                      value: '${s.totalElevationMeters.toStringAsFixed(0)} m'),
-                    _StatTile(
-                      label: 'Tamamlanan görev',
-                      value: '${s.completedChallenges}'),
-                    _StatTile(
-                      label: 'Güncel seri',
-                      value: '${streak?.current ?? 0} gün'),
-                    _StatTile(
-                      label: 'En uzun seri',
-                      value: '${streak?.longest ?? 0} gün'),
-                  ],
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: 1.7,
+                  children: items.map((d) => _StatTile(data: d)).toList(),
                 );
               },
             ),
             const SizedBox(height: 24),
-            Text('Rozetler',
-                style: Theme.of(context).textTheme.titleLarge),
+            const SectionHeader('Rozetler'),
             const SizedBox(height: 12),
             badgesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -73,9 +72,11 @@ class ProfileScreen extends ConsumerWidget {
                 crossAxisCount: 4,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                children: badges
-                    .map((b) => _BadgeTile(badge: b))
-                    .toList(),
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.74,
+                children:
+                    badges.map((b) => _BadgeTile(badge: b)).toList(),
               ),
             ),
             const SizedBox(height: 24),
@@ -97,30 +98,35 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _StatTile extends StatelessWidget {
+class _StatData {
   final String label;
   final String value;
-  const _StatTile({required this.label, required this.value});
+  final IconData icon;
+
+  _StatData(this.label, this.value, this.icon);
+}
+
+class _StatTile extends StatelessWidget {
+  final _StatData data;
+  const _StatTile({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(value,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(data.icon, size: 20, color: AppColors.brand),
+          const SizedBox(height: 8),
+          Text(data.value,
+              style: const TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(data.label,
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.textMuted)),
+        ],
       ),
     );
   }
@@ -132,24 +138,42 @@ class _BadgeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final earned = badge.earned;
+
     return Tooltip(
       message: '${badge.title}\n${badge.description}',
-      child: Opacity(
-        opacity: badge.earned ? 1 : 0.3,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(badge.emoji, style: const TextStyle(fontSize: 32)),
-            const SizedBox(height: 4),
-            Text(
-              badge.title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: earned
+                  ? AppColors.brand.withOpacity(0.12)
+                  : const Color(0xFFEDEFEE),
+              shape: BoxShape.circle,
             ),
-          ],
-        ),
+            child: Center(
+              child: Icon(
+                badge.icon,
+                size: 26,
+                color: earned ? AppColors.brand : Colors.black26,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            badge.title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: earned ? FontWeight.w600 : FontWeight.w400,
+              color: earned ? Colors.black87 : Colors.black38,
+            ),
+          ),
+        ],
       ),
     );
   }

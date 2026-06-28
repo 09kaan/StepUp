@@ -2,6 +2,7 @@ import 'package:apple_maps_flutter/apple_maps_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../theme/app_theme.dart';
 import 'walk_tracking_controller.dart';
 
 class WalkTrackingScreen extends ConsumerWidget {
@@ -35,28 +36,33 @@ class WalkTrackingScreen extends ConsumerWidget {
       body: Column(
         children: [
           Expanded(
-            child: AppleMap(
-              initialCameraPosition:
-                  CameraPosition(target: center, zoom: 16),
-              myLocationEnabled: true,
-              trackingMode: state.isTracking
-                  ? TrackingMode.follow
-                  : TrackingMode.none,
-              polylines: mapPoints.length >= 2
-                  ? {
-                      Polyline(
-                        polylineId: PolylineId('route'),
-                        points: mapPoints,
-                        color: Colors.blue,
-                        width: 5,
-                      ),
-                    }
-                  : <Polyline>{},
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(28)),
+              child: AppleMap(
+                initialCameraPosition:
+                    CameraPosition(target: center, zoom: 16),
+                myLocationEnabled: true,
+                trackingMode: state.isTracking
+                    ? TrackingMode.follow
+                    : TrackingMode.none,
+                polylines: mapPoints.length >= 2
+                    ? {
+                        Polyline(
+                          polylineId: PolylineId('route'),
+                          points: mapPoints,
+                          color: Colors.blue,
+                          width: 5,
+                        ),
+                      }
+                    : <Polyline>{},
+              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 if (state.error != null)
                   Padding(
@@ -67,39 +73,50 @@ class WalkTrackingScreen extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _Stat(
-                        label: 'Mesafe',
+                    _WalkStat(
                         value:
-                            '${(state.distanceMeters / 1000).toStringAsFixed(2)} km'),
-                    _Stat(label: 'Süre', value: _fmt(state.elapsed)),
+                            '${(state.distanceMeters / 1000).toStringAsFixed(2)} km',
+                        label: 'Mesafe'),
+                    _WalkStat(
+                        value: _fmt(state.elapsed), label: 'Süre'),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
-                  child: state.isTracking
-                      ? FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red),
-                          onPressed: () async {
-                            final s = await controller.stop();
-                            if (context.mounted && s != null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      'Yürüyüş kaydedildi: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km'),
-                                ),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.stop),
-                          label: const Text('Bitir'),
-                        )
-                      : FilledButton.icon(
-                          onPressed: () => controller.start(),
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('Yürüyüşü Başlat'),
-                        ),
+                  height: 56,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: state.isTracking
+                          ? Colors.red.shade600
+                          : AppColors.brand,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28)),
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: () async {
+                      if (state.isTracking) {
+                        final s = await controller.stop();
+                        if (context.mounted && s != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Yürüyüş kaydedildi: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km'),
+                            ),
+                          );
+                        }
+                      } else {
+                        controller.start();
+                      }
+                    },
+                    icon: Icon(state.isTracking
+                        ? Icons.stop
+                        : Icons.play_arrow),
+                    label: Text(state.isTracking
+                        ? 'Yürüyüşü Bitir'
+                        : 'Yürüyüşü Başlat'),
+                  ),
                 ),
               ],
             ),
@@ -110,18 +127,23 @@ class WalkTrackingScreen extends ConsumerWidget {
   }
 }
 
-class _Stat extends StatelessWidget {
-  final String label;
+class _WalkStat extends StatelessWidget {
   final String value;
+  final String label;
 
-  const _Stat({required this.label, required this.value});
+  const _WalkStat({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: Theme.of(context).textTheme.titleLarge),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 24, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 2),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13, color: AppColors.textMuted)),
       ],
     );
   }
