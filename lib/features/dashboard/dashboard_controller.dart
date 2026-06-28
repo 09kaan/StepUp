@@ -7,6 +7,7 @@ import '../../services/health_service.dart';
 import '../../services/settings_repository.dart';
 import '../../services/streak_service.dart';
 import '../../services/suggestion_service.dart';
+import '../../services/home_widget_service.dart';
 
 final healthServiceProvider = Provider<HealthService>((ref) => HealthService());
 
@@ -35,7 +36,9 @@ final todayActivityProvider =
   final repo = ref.watch(dailyActivityRepoProvider);
   final goal = await ref.watch(settingsRepoProvider).stepGoal();
 
-  return repo.upsertToday(summary, goalSteps: goal);
+  final activity = await repo.upsertToday(summary, goalSteps: goal);
+  await HomeWidgetService.update(steps: activity.steps, goal: activity.goalSteps);
+  return activity;
 });
 
 final goalSuggestionProvider =

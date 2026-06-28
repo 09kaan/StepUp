@@ -4,6 +4,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'services/notification_service.dart';
+import 'services/home_widget_service.dart';
 import 'app.dart';
 import 'models/app_settings.dart';
 import 'models/challenge.dart';
@@ -34,6 +35,8 @@ Future<void> main() async {
   await NotificationService.instance.init();
   await NotificationService.instance.requestPermissions();
   await NotificationService.instance.scheduleDailyReminder(hour: 19, minute: 0);
+
+  await HomeWidgetService.init();
 
   runApp(
     ProviderScope(

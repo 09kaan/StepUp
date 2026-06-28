@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#FFFFFF">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Bugün" android:textSize="12sp" android:textColor="#6B7280" />
+
+    <TextView android:id="@+id/widget_steps" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:text="0"
+        android:textSize="26sp" android:textStyle="bold" android:textColor="#111827" />
+
+    <TextView android:id="@+id/widget_goal" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:text="/ 6000 adım"
+        android:textSize="11sp" android:textColor="#6B7280" />
+
+    <ProgressBar android:id="@+id/widget_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="6dp" android:max="6000" android:progress="0" />
+
+</LinearLayout>
