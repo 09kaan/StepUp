@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'app.dart';
 import 'models/challenge.dart';
 import 'models/daily_activity.dart';
+import 'models/walk_session.dart';
 
 /// Isar'a her yerden Riverpod ile erişacağız.
 final isarProvider = Provider<Isar>((ref) {
@@ -17,7 +18,7 @@ Future<void> main() async {
 
   final dir = await getApplicationDocumentsDirectory();
   final isar = await Isar.open(
-    [ChallengeSchema, DailyActivitySchema],
+    [ChallengeSchema, DailyActivitySchema, WalkSessionSchema],
     directory: dir.path,
   );
 

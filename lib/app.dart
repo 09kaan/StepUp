@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/walk/walk_tracking_screen.dart';
 
 class FitWalkApp extends StatelessWidget {
   const FitWalkApp({super.key});
@@ -30,6 +31,7 @@ class _RootScreenState extends State<RootScreen> {
 
   final _screens = const [
     DashboardScreen(),
+    WalkTrackingScreen(),
     Center(child: Text('Görevler (yakında)')),
     Center(child: Text('Profil (yakında)')),
   ];
@@ -45,6 +47,10 @@ class _RootScreenState extends State<RootScreen> {
           NavigationDestination(
             icon: Icon(Icons.directions_walk),
             label: 'Bugün',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map),
+            label: 'Yürüyüş',
           ),
           NavigationDestination(
             icon: Icon(Icons.flag),
