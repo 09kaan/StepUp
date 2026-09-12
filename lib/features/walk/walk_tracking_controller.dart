@@ -147,6 +147,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         ..addAll(session.points);
 
       _totalElevationGain = session.elevationGainMeters;
+      _climbingDistanceMeters = session.climbingDistanceMeters;
       _maxAltitude =
           session.maxAltitude == 0 ? null : session.maxAltitude;
 
@@ -248,6 +249,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       ..isPaused = state.isPaused
       ..distanceMeters = state.distanceMeters
       ..elevationGainMeters = _totalElevationGain
+      ..climbingDistanceMeters = _climbingDistanceMeters
       ..maxAltitude = _maxAltitude ?? 0
       ..movingDurationSeconds = _currentMovingSeconds
       ..lastCheckpointAt = DateTime.now()
@@ -598,6 +600,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       ..isPaused = false
       ..distanceMeters = state.distanceMeters
       ..elevationGainMeters = _totalElevationGain
+      ..climbingDistanceMeters = _climbingDistanceMeters
       ..avgGradePercent = avgClimbingGrade
       ..maxAltitude = _maxAltitude ?? 0
       ..movingDurationSeconds = _accumulatedMovingSeconds

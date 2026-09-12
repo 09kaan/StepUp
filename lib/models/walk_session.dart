@@ -19,6 +19,8 @@ class WalkSession {
 
   double avgGradePercent = 0;
 
+  double climbingDistanceMeters = 0;
+
   double maxAltitude = 0;
 
   /// Yürüyüş hâlâ devam ediyor mu?

@@ -22,59 +22,64 @@ const WalkSessionSchema = CollectionSchema(
       name: r'avgGradePercent',
       type: IsarType.double,
     ),
-    r'distanceMeters': PropertySchema(
+    r'climbingDistanceMeters': PropertySchema(
       id: 1,
+      name: r'climbingDistanceMeters',
+      type: IsarType.double,
+    ),
+    r'distanceMeters': PropertySchema(
+      id: 2,
       name: r'distanceMeters',
       type: IsarType.double,
     ),
     r'elevationGainMeters': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'elevationGainMeters',
       type: IsarType.double,
     ),
     r'endTime': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'endTime',
       type: IsarType.dateTime,
     ),
     r'isActive': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'isActive',
       type: IsarType.bool,
     ),
     r'isPaused': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'isPaused',
       type: IsarType.bool,
     ),
     r'lastCheckpointAt': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'lastCheckpointAt',
       type: IsarType.dateTime,
     ),
     r'maxAltitude': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'maxAltitude',
       type: IsarType.double,
     ),
     r'movingDurationSeconds': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'movingDurationSeconds',
       type: IsarType.long,
     ),
     r'points': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'points',
       type: IsarType.objectList,
       target: r'RoutePoint',
     ),
     r'startTime': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'startTime',
       type: IsarType.dateTime,
     ),
     r'title': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'title',
       type: IsarType.string,
     )
@@ -150,22 +155,23 @@ void _walkSessionSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDouble(offsets[0], object.avgGradePercent);
-  writer.writeDouble(offsets[1], object.distanceMeters);
-  writer.writeDouble(offsets[2], object.elevationGainMeters);
-  writer.writeDateTime(offsets[3], object.endTime);
-  writer.writeBool(offsets[4], object.isActive);
-  writer.writeBool(offsets[5], object.isPaused);
-  writer.writeDateTime(offsets[6], object.lastCheckpointAt);
-  writer.writeDouble(offsets[7], object.maxAltitude);
-  writer.writeLong(offsets[8], object.movingDurationSeconds);
+  writer.writeDouble(offsets[1], object.climbingDistanceMeters);
+  writer.writeDouble(offsets[2], object.distanceMeters);
+  writer.writeDouble(offsets[3], object.elevationGainMeters);
+  writer.writeDateTime(offsets[4], object.endTime);
+  writer.writeBool(offsets[5], object.isActive);
+  writer.writeBool(offsets[6], object.isPaused);
+  writer.writeDateTime(offsets[7], object.lastCheckpointAt);
+  writer.writeDouble(offsets[8], object.maxAltitude);
+  writer.writeLong(offsets[9], object.movingDurationSeconds);
   writer.writeObjectList<RoutePoint>(
-    offsets[9],
+    offsets[10],
     allOffsets,
     RoutePointSchema.serialize,
     object.points,
   );
-  writer.writeDateTime(offsets[10], object.startTime);
-  writer.writeString(offsets[11], object.title);
+  writer.writeDateTime(offsets[11], object.startTime);
+  writer.writeString(offsets[12], object.title);
 }
 
 WalkSession _walkSessionDeserialize(
@@ -176,24 +182,25 @@ WalkSession _walkSessionDeserialize(
 ) {
   final object = WalkSession();
   object.avgGradePercent = reader.readDouble(offsets[0]);
-  object.distanceMeters = reader.readDouble(offsets[1]);
-  object.elevationGainMeters = reader.readDouble(offsets[2]);
-  object.endTime = reader.readDateTimeOrNull(offsets[3]);
+  object.climbingDistanceMeters = reader.readDouble(offsets[1]);
+  object.distanceMeters = reader.readDouble(offsets[2]);
+  object.elevationGainMeters = reader.readDouble(offsets[3]);
+  object.endTime = reader.readDateTimeOrNull(offsets[4]);
   object.id = id;
-  object.isActive = reader.readBool(offsets[4]);
-  object.isPaused = reader.readBool(offsets[5]);
-  object.lastCheckpointAt = reader.readDateTimeOrNull(offsets[6]);
-  object.maxAltitude = reader.readDouble(offsets[7]);
-  object.movingDurationSeconds = reader.readLong(offsets[8]);
+  object.isActive = reader.readBool(offsets[5]);
+  object.isPaused = reader.readBool(offsets[6]);
+  object.lastCheckpointAt = reader.readDateTimeOrNull(offsets[7]);
+  object.maxAltitude = reader.readDouble(offsets[8]);
+  object.movingDurationSeconds = reader.readLong(offsets[9]);
   object.points = reader.readObjectList<RoutePoint>(
-        offsets[9],
+        offsets[10],
         RoutePointSchema.deserialize,
         allOffsets,
         RoutePoint(),
       ) ??
       [];
-  object.startTime = reader.readDateTime(offsets[10]);
-  object.title = reader.readStringOrNull(offsets[11]);
+  object.startTime = reader.readDateTime(offsets[11]);
+  object.title = reader.readStringOrNull(offsets[12]);
   return object;
 }
 
@@ -211,18 +218,20 @@ P _walkSessionDeserializeProp<P>(
     case 2:
       return (reader.readDouble(offset)) as P;
     case 3:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 5:
       return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 7:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 8:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
       return (reader.readObjectList<RoutePoint>(
             offset,
             RoutePointSchema.deserialize,
@@ -230,9 +239,9 @@ P _walkSessionDeserializeProp<P>(
             RoutePoint(),
           ) ??
           []) as P;
-    case 10:
-      return (reader.readDateTime(offset)) as P;
     case 11:
+      return (reader.readDateTime(offset)) as P;
+    case 12:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -541,6 +550,72 @@ extension WalkSessionQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'avgGradePercent',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      climbingDistanceMetersEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'climbingDistanceMeters',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      climbingDistanceMetersGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'climbingDistanceMeters',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      climbingDistanceMetersLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'climbingDistanceMeters',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      climbingDistanceMetersBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'climbingDistanceMeters',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -1346,6 +1421,20 @@ extension WalkSessionQuerySortBy
     });
   }
 
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      sortByClimbingDistanceMeters() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'climbingDistanceMeters', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      sortByClimbingDistanceMetersDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'climbingDistanceMeters', Sort.desc);
+    });
+  }
+
   QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByDistanceMeters() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'distanceMeters', Sort.asc);
@@ -1486,6 +1575,20 @@ extension WalkSessionQuerySortThenBy
       thenByAvgGradePercentDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'avgGradePercent', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      thenByClimbingDistanceMeters() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'climbingDistanceMeters', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      thenByClimbingDistanceMetersDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'climbingDistanceMeters', Sort.desc);
     });
   }
 
@@ -1638,6 +1741,13 @@ extension WalkSessionQueryWhereDistinct
     });
   }
 
+  QueryBuilder<WalkSession, WalkSession, QDistinct>
+      distinctByClimbingDistanceMeters() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'climbingDistanceMeters');
+    });
+  }
+
   QueryBuilder<WalkSession, WalkSession, QDistinct> distinctByDistanceMeters() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'distanceMeters');
@@ -1715,6 +1825,13 @@ extension WalkSessionQueryProperty
       avgGradePercentProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'avgGradePercent');
+    });
+  }
+
+  QueryBuilder<WalkSession, double, QQueryOperations>
+      climbingDistanceMetersProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'climbingDistanceMeters');
     });
   }
 
