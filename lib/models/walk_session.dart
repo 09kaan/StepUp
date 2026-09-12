@@ -21,11 +21,31 @@ class WalkSession {
 
   double maxAltitude = 0;
 
+  /// Yürüyüş hâlâ devam ediyor mu?
+  @Index()
+  bool isActive = false;
+
+  /// Kullanıcı yürüyüşü manuel olarak duraklattı mı?
+  bool isPaused = false;
+
+  /// Duraklatmalar hariç hareket/kayıt süresi.
+  int movingDurationSeconds = 0;
+
+  /// Son güvenli veritabanı kaydının zamanı.
+  DateTime? lastCheckpointAt;
+
   List<RoutePoint> points = [];
 
   @ignore
-  int get durationSeconds =>
-      endTime == null ? 0 : endTime!.difference(startTime).inSeconds;
+  int get durationSeconds {
+    if (movingDurationSeconds > 0) {
+      return movingDurationSeconds;
+    }
+    if (endTime == null) {
+      return 0;
+    }
+    return endTime!.difference(startTime).inSeconds;
+  }
 
   @ignore
   String get displayTitle {

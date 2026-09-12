@@ -23,7 +23,8 @@ class ProfileRepository {
   ProfileRepository(this.isar);
 
   Future<ProfileStats> compute() async {
-    final walks = await isar.walkSessions.where().findAll();
+    final walks =
+        await isar.walkSessions.filter().isActiveEqualTo(false).findAll();
     double km = 0;
     double elev = 0;
 

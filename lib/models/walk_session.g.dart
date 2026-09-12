@@ -37,24 +37,44 @@ const WalkSessionSchema = CollectionSchema(
       name: r'endTime',
       type: IsarType.dateTime,
     ),
-    r'maxAltitude': PropertySchema(
+    r'isActive': PropertySchema(
       id: 4,
+      name: r'isActive',
+      type: IsarType.bool,
+    ),
+    r'isPaused': PropertySchema(
+      id: 5,
+      name: r'isPaused',
+      type: IsarType.bool,
+    ),
+    r'lastCheckpointAt': PropertySchema(
+      id: 6,
+      name: r'lastCheckpointAt',
+      type: IsarType.dateTime,
+    ),
+    r'maxAltitude': PropertySchema(
+      id: 7,
       name: r'maxAltitude',
       type: IsarType.double,
     ),
+    r'movingDurationSeconds': PropertySchema(
+      id: 8,
+      name: r'movingDurationSeconds',
+      type: IsarType.long,
+    ),
     r'points': PropertySchema(
-      id: 5,
+      id: 9,
       name: r'points',
       type: IsarType.objectList,
       target: r'RoutePoint',
     ),
     r'startTime': PropertySchema(
-      id: 6,
+      id: 10,
       name: r'startTime',
       type: IsarType.dateTime,
     ),
     r'title': PropertySchema(
-      id: 7,
+      id: 11,
       name: r'title',
       type: IsarType.string,
     )
@@ -73,6 +93,19 @@ const WalkSessionSchema = CollectionSchema(
       properties: [
         IndexPropertySchema(
           name: r'startTime',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'isActive': IndexSchema(
+      id: 8092228061260947457,
+      name: r'isActive',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'isActive',
           type: IndexType.value,
           caseSensitive: false,
         )
@@ -120,15 +153,19 @@ void _walkSessionSerialize(
   writer.writeDouble(offsets[1], object.distanceMeters);
   writer.writeDouble(offsets[2], object.elevationGainMeters);
   writer.writeDateTime(offsets[3], object.endTime);
-  writer.writeDouble(offsets[4], object.maxAltitude);
+  writer.writeBool(offsets[4], object.isActive);
+  writer.writeBool(offsets[5], object.isPaused);
+  writer.writeDateTime(offsets[6], object.lastCheckpointAt);
+  writer.writeDouble(offsets[7], object.maxAltitude);
+  writer.writeLong(offsets[8], object.movingDurationSeconds);
   writer.writeObjectList<RoutePoint>(
-    offsets[5],
+    offsets[9],
     allOffsets,
     RoutePointSchema.serialize,
     object.points,
   );
-  writer.writeDateTime(offsets[6], object.startTime);
-  writer.writeString(offsets[7], object.title);
+  writer.writeDateTime(offsets[10], object.startTime);
+  writer.writeString(offsets[11], object.title);
 }
 
 WalkSession _walkSessionDeserialize(
@@ -143,16 +180,20 @@ WalkSession _walkSessionDeserialize(
   object.elevationGainMeters = reader.readDouble(offsets[2]);
   object.endTime = reader.readDateTimeOrNull(offsets[3]);
   object.id = id;
-  object.maxAltitude = reader.readDouble(offsets[4]);
+  object.isActive = reader.readBool(offsets[4]);
+  object.isPaused = reader.readBool(offsets[5]);
+  object.lastCheckpointAt = reader.readDateTimeOrNull(offsets[6]);
+  object.maxAltitude = reader.readDouble(offsets[7]);
+  object.movingDurationSeconds = reader.readLong(offsets[8]);
   object.points = reader.readObjectList<RoutePoint>(
-        offsets[5],
+        offsets[9],
         RoutePointSchema.deserialize,
         allOffsets,
         RoutePoint(),
       ) ??
       [];
-  object.startTime = reader.readDateTime(offsets[6]);
-  object.title = reader.readStringOrNull(offsets[7]);
+  object.startTime = reader.readDateTime(offsets[10]);
+  object.title = reader.readStringOrNull(offsets[11]);
   return object;
 }
 
@@ -172,8 +213,16 @@ P _walkSessionDeserializeProp<P>(
     case 3:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 4:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 5:
+      return (reader.readBool(offset)) as P;
+    case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 7:
+      return (reader.readDouble(offset)) as P;
+    case 8:
+      return (reader.readLong(offset)) as P;
+    case 9:
       return (reader.readObjectList<RoutePoint>(
             offset,
             RoutePointSchema.deserialize,
@@ -181,9 +230,9 @@ P _walkSessionDeserializeProp<P>(
             RoutePoint(),
           ) ??
           []) as P;
-    case 6:
+    case 10:
       return (reader.readDateTime(offset)) as P;
-    case 7:
+    case 11:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -215,6 +264,14 @@ extension WalkSessionQueryWhereSort
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         const IndexWhereClause.any(indexName: r'startTime'),
+      );
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterWhere> anyIsActive() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'isActive'),
       );
     });
   }
@@ -376,6 +433,51 @@ extension WalkSessionQueryWhere
         upper: [upperStartTime],
         includeUpper: includeUpper,
       ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterWhereClause> isActiveEqualTo(
+      bool isActive) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'isActive',
+        value: [isActive],
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterWhereClause> isActiveNotEqualTo(
+      bool isActive) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isActive',
+              lower: [],
+              upper: [isActive],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isActive',
+              lower: [isActive],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isActive',
+              lower: [isActive],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isActive',
+              lower: [],
+              upper: [isActive],
+              includeUpper: false,
+            ));
+      }
     });
   }
 }
@@ -705,6 +807,100 @@ extension WalkSessionQueryFilter
     });
   }
 
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition> isActiveEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isActive',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition> isPausedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isPaused',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      lastCheckpointAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastCheckpointAt',
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      lastCheckpointAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastCheckpointAt',
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      lastCheckpointAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastCheckpointAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      lastCheckpointAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastCheckpointAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      lastCheckpointAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastCheckpointAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      lastCheckpointAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastCheckpointAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
       maxAltitudeEqualTo(
     double value, {
@@ -767,6 +963,62 @@ extension WalkSessionQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      movingDurationSecondsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'movingDurationSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      movingDurationSecondsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'movingDurationSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      movingDurationSecondsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'movingDurationSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterFilterCondition>
+      movingDurationSecondsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'movingDurationSeconds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1133,6 +1385,44 @@ extension WalkSessionQuerySortBy
     });
   }
 
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByIsActive() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isActive', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByIsActiveDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isActive', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByIsPaused() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPaused', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByIsPausedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPaused', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      sortByLastCheckpointAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCheckpointAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      sortByLastCheckpointAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCheckpointAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByMaxAltitude() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxAltitude', Sort.asc);
@@ -1142,6 +1432,20 @@ extension WalkSessionQuerySortBy
   QueryBuilder<WalkSession, WalkSession, QAfterSortBy> sortByMaxAltitudeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxAltitude', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      sortByMovingDurationSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'movingDurationSeconds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      sortByMovingDurationSecondsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'movingDurationSeconds', Sort.desc);
     });
   }
 
@@ -1236,6 +1540,44 @@ extension WalkSessionQuerySortThenBy
     });
   }
 
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> thenByIsActive() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isActive', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> thenByIsActiveDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isActive', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> thenByIsPaused() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPaused', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy> thenByIsPausedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPaused', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      thenByLastCheckpointAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCheckpointAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      thenByLastCheckpointAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCheckpointAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<WalkSession, WalkSession, QAfterSortBy> thenByMaxAltitude() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxAltitude', Sort.asc);
@@ -1245,6 +1587,20 @@ extension WalkSessionQuerySortThenBy
   QueryBuilder<WalkSession, WalkSession, QAfterSortBy> thenByMaxAltitudeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxAltitude', Sort.desc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      thenByMovingDurationSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'movingDurationSeconds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QAfterSortBy>
+      thenByMovingDurationSecondsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'movingDurationSeconds', Sort.desc);
     });
   }
 
@@ -1301,9 +1657,35 @@ extension WalkSessionQueryWhereDistinct
     });
   }
 
+  QueryBuilder<WalkSession, WalkSession, QDistinct> distinctByIsActive() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isActive');
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QDistinct> distinctByIsPaused() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isPaused');
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QDistinct>
+      distinctByLastCheckpointAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastCheckpointAt');
+    });
+  }
+
   QueryBuilder<WalkSession, WalkSession, QDistinct> distinctByMaxAltitude() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'maxAltitude');
+    });
+  }
+
+  QueryBuilder<WalkSession, WalkSession, QDistinct>
+      distinctByMovingDurationSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'movingDurationSeconds');
     });
   }
 
@@ -1355,9 +1737,35 @@ extension WalkSessionQueryProperty
     });
   }
 
+  QueryBuilder<WalkSession, bool, QQueryOperations> isActiveProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isActive');
+    });
+  }
+
+  QueryBuilder<WalkSession, bool, QQueryOperations> isPausedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isPaused');
+    });
+  }
+
+  QueryBuilder<WalkSession, DateTime?, QQueryOperations>
+      lastCheckpointAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastCheckpointAt');
+    });
+  }
+
   QueryBuilder<WalkSession, double, QQueryOperations> maxAltitudeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'maxAltitude');
+    });
+  }
+
+  QueryBuilder<WalkSession, int, QQueryOperations>
+      movingDurationSecondsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'movingDurationSeconds');
     });
   }
 

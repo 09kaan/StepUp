@@ -36,7 +36,8 @@ class RecordsRepository {
 
   Future<PersonalRecords> compute() async {
     final days = await isar.dailyActivitys.where().findAll();
-    final sessions = await isar.walkSessions.where().findAll();
+    final sessions =
+        await isar.walkSessions.filter().isActiveEqualTo(false).findAll();
 
     DailyActivity? bestDay;
     int totalSteps = 0;
