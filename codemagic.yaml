@@ -25,6 +25,32 @@ workflows:
           app-store-connect fetch-signing-files "com.kaan.fitwalk.FitWalkWidget" --type IOS_APP_STORE --certificate-key @env:CERTIFICATE_PRIVATE_KEY --create
           keychain add-certificates
           xcode-project use-profiles
+      - name: Widget version bilgilerini ayarla
+        script: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+
+          /usr/libexec/PlistBuddy \
+            -c "Set :CFBundleShortVersionString $APP_VERSION" \
+            ios/FitWalkWidget/Info.plist
+
+          /usr/libexec/PlistBuddy \
+            -c "Set :CFBundleVersion $BUILD_NUMBER" \
+            ios/FitWalkWidget/Info.plist
+
+          echo "Widget sürümü:"
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleShortVersionString" \
+            ios/FitWalkWidget/Info.plist
+
+          echo "Widget build numarası:"
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleVersion" \
+            ios/FitWalkWidget/Info.plist
+
+          echo "Widget extension tipi:"
+          /usr/libexec/PlistBuddy \
+            -c "Print :NSExtension:NSExtensionPointIdentifier" \
+            ios/FitWalkWidget/Info.plist  
       - name: Flutter build ipa
         script: flutter build ipa --release --build-number=$BUILD_NUMBER --export-options-plist=/Users/builder/export_options.plist
     artifacts:
