@@ -21,7 +21,6 @@ class ElevationProfileCard extends StatelessWidget {
     final dists = <double>[0.0];
     final alts = <double>[points.first.altitude];
     double totalDistM = 0;
-    double maxGrade = 0;
 
     for (int i = 1; i < points.length; i++) {
       final p1 = points[i - 1];
@@ -30,12 +29,6 @@ class ElevationProfileCard extends StatelessWidget {
       totalDistM += d;
       dists.add(totalDistM / 1000.0); // km cinsinden
       alts.add(p2.altitude);
-
-      final diff = p2.altitude - p1.altitude;
-      if (d >= 8.0 && p1.altitudeAccuracy > 0 && p2.altitudeAccuracy > 0) {
-        final g = (diff / d) * 100;
-        if (g > maxGrade) maxGrade = g;
-      }
     }
 
     // Hareketli ortalama ile grafiği yumuşat (smoothing)
@@ -54,6 +47,24 @@ class ElevationProfileCard extends StatelessWidget {
       smoothedAlts.add(sum / count);
     }
 
+    // Maksimum eğim: Yumuşatılmış irtifalardan ve geçerli doğruluktaki segmentlerden hesaplanır
+    double maxGrade = 0;
+    for (int i = 1; i < points.length; i++) {
+      final p1 = points[i - 1];
+      final p2 = points[i];
+      final d = Geolocator.distanceBetween(p1.lat, p1.lng, p2.lat, p2.lng);
+      final isAccurate = p1.altitudeAccuracy > 0 &&
+          p1.altitudeAccuracy <= 15.0 &&
+          p2.altitudeAccuracy > 0 &&
+          p2.altitudeAccuracy <= 15.0;
+
+      if (d >= 8.0 && isAccurate) {
+        final diff = smoothedAlts[i] - smoothedAlts[i - 1];
+        final g = (diff / d) * 100;
+        if (g > maxGrade) maxGrade = g;
+      }
+    }
+
     // Gerçek min ve maks irtifa değerleri
     final actualMinAlt = smoothedAlts.reduce(math.min);
     final actualMaxAlt = smoothedAlts.reduce(math.max);
@@ -68,7 +79,7 @@ class ElevationProfileCard extends StatelessWidget {
       chartMaxAlt = center + 5.0;
     }
 
-    // İniş hesabı: 1.5m ölü bölge + 5m yatay hareket filtresi (sahte salınımları engeller)
+    // İniş hesabı: 1.5m ölü bölge + 5m yatay hareket + doğruluk (accuracy <= 15) filtresi
     double loss = 0;
     double lastValidAlt = points.first.altitude;
     double lastHPosLat = points.first.lat;
@@ -76,6 +87,9 @@ class ElevationProfileCard extends StatelessWidget {
 
     for (int i = 1; i < points.length; i++) {
       final p = points[i];
+      final isAccurate = p.altitudeAccuracy > 0 && p.altitudeAccuracy <= 15.0;
+      if (!isAccurate) continue;
+
       final hDist =
           Geolocator.distanceBetween(lastHPosLat, lastHPosLng, p.lat, p.lng);
       final altDiff = p.altitude - lastValidAlt;
