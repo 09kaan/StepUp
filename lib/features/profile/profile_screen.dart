@@ -169,7 +169,7 @@ class _BadgeTile extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               color: earned
-                  ? AppColors.brand.withOpacity(0.12)
+                  ? AppColors.brand.withValues(alpha: 0.12)
                   : const Color(0xFFEDEFEE),
               shape: BoxShape.circle,
             ),

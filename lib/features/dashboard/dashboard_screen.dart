@@ -3,9 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../services/suggestion_service.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../theme/app_theme.dart';
+import '../walk/walk_detail_screen.dart';
+import '../walk/walk_history_screen.dart';
+import '../walk/walk_tracking_controller.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -81,6 +86,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             final goal = a.goalSteps;
             final km = a.distanceMeters / 1000;
             final kcal = a.activeCalories;
+            final flights = a.flightsClimbed;
             final pct =
                 goal > 0 ? ((steps / goal) * 100).clamp(0, 100).round() : 0;
             final goalReached = a.goalReached;
@@ -101,7 +107,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                         label: 'Mesafe',
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _MiniStat(
                         icon: Icons.local_fire_department,
@@ -109,7 +115,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                         label: 'Kalori',
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _MiniStat(
+                        icon: Icons.stairs,
+                        value: '$flights kat',
+                        label: 'Kat',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _MiniStat(
                         icon: Icons.flag,
@@ -154,6 +168,86 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       ref.invalidate(streakProvider);
                     },
                   ),
+                ),
+                ref.watch(walkHistoryProvider).maybeWhen(
+                  data: (walks) {
+                    if (walks.isEmpty) return const SizedBox.shrink();
+                    final last = walks.first;
+                    final km = (last.distanceMeters / 1000).toStringAsFixed(2);
+                    final durMin = (last.durationSeconds / 60).toStringAsFixed(0);
+                    final dateStr =
+                        DateFormat('dd MMM • HH:mm', 'tr_TR').format(last.startTime);
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Son Yürüyüş',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w700),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) => const WalkHistoryScreen()),
+                              ),
+                              child: const Text('Tümünü Gör'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        AppCard(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => WalkDetailScreen(session: last),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: AppColors.brand.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.directions_walk,
+                                    color: AppColors.brand),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      last.displayTitle,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '$km km • $durMin dk • $dateStr',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textMuted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right,
+                                  color: AppColors.textMuted),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  orElse: () => const SizedBox.shrink(),
                 ),
               ],
             );
@@ -244,18 +338,21 @@ class _MiniStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
       child: Column(
         children: [
           Icon(icon, size: 20, color: AppColors.brand),
           const SizedBox(height: 8),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700)),
+          ),
           const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(
-                  fontSize: 12, color: AppColors.textMuted)),
+                  fontSize: 11, color: AppColors.textMuted)),
         ],
       ),
     );

@@ -97,7 +97,7 @@ class _ChallengeTile extends ConsumerWidget {
             height: 44,
             decoration: BoxDecoration(
               color: AppColors.brand
-                  .withOpacity(c.isCompleted ? 0.18 : 0.10),
+                  .withValues(alpha: c.isCompleted ? 0.18 : 0.10),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(

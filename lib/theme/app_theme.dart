@@ -60,7 +60,7 @@ class AppTheme {
         backgroundColor: Colors.white,
         elevation: 0,
         height: 64,
-        indicatorColor: AppColors.brand.withOpacity(0.12),
+        indicatorColor: AppColors.brand.withValues(alpha: 0.12),
         labelTextStyle: WidgetStateProperty.all(
           const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         ),

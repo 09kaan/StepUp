@@ -8,6 +8,7 @@ class HealthService {
     HealthDataType.STEPS,
     HealthDataType.DISTANCE_WALKING_RUNNING,
     HealthDataType.ACTIVE_ENERGY_BURNED,
+    HealthDataType.FLIGHTS_CLIMBED,
   ];
 
   /// İzin ister (gerekirse Health Connect'i de yapılandırır).
@@ -28,6 +29,7 @@ class HealthService {
       types: const [
         HealthDataType.DISTANCE_WALKING_RUNNING,
         HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.FLIGHTS_CLIMBED,
       ],
       startTime: midnight,
       endTime: now,
@@ -35,6 +37,7 @@ class HealthService {
 
     double distance = 0;
     double calories = 0;
+    int flights = 0;
 
     for (final point in data) {
       final value =
@@ -47,6 +50,9 @@ class HealthService {
         case HealthDataType.ACTIVE_ENERGY_BURNED:
           calories += value;
           break;
+        case HealthDataType.FLIGHTS_CLIMBED:
+          flights += value.round();
+          break;
         default:
           break;
       }
@@ -56,6 +62,7 @@ class HealthService {
       steps: steps,
       distanceMeters: distance,
       activeCalories: calories,
+      flightsClimbed: flights,
     );
   }
 }
@@ -65,10 +72,12 @@ class HealthSummary {
   final int steps;
   final double distanceMeters;
   final double activeCalories;
+  final int flightsClimbed;
 
   const HealthSummary({
     required this.steps,
     required this.distanceMeters,
     required this.activeCalories,
+    this.flightsClimbed = 0,
   });
 }

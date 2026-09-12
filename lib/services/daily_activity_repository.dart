@@ -27,6 +27,7 @@ class DailyActivityRepository {
       record.steps = summary.steps;
       record.distanceMeters = summary.distanceMeters;
       record.activeCalories = summary.activeCalories;
+      record.flightsClimbed = summary.flightsClimbed;
       record.goalSteps = goalSteps;
       record.goalReached = summary.steps >= goalSteps;
 

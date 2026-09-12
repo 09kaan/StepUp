@@ -46,12 +46,17 @@ class RecordsRepository {
     }
 
     WalkSession? longestWalk;
+    WalkSession? highestClimbWalk;
     double totalKm = 0;
     for (final s in sessions) {
       totalKm += s.distanceMeters / 1000;
       if (longestWalk == null ||
           s.distanceMeters > longestWalk.distanceMeters) {
         longestWalk = s;
+      }
+      if (highestClimbWalk == null ||
+          s.elevationGainMeters > highestClimbWalk.elevationGainMeters) {
+        highestClimbWalk = s;
       }
     }
 
@@ -61,8 +66,8 @@ class RecordsRepository {
       longestWalkKm: (longestWalk?.distanceMeters ?? 0) / 1000,
       longestWalkDate: longestWalk?.startTime,
       longestWalkSeconds: longestWalk?.durationSeconds ?? 0,
-      highestElevation: 0,
-      highestElevationDate: null,
+      highestElevation: highestClimbWalk?.elevationGainMeters ?? 0,
+      highestElevationDate: highestClimbWalk?.startTime,
       longestStreak: _longestStreak(days),
       totalSteps: totalSteps,
       totalKm: totalKm,

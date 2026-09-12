@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'features/challenges/challenges_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/profile/profile_screen.dart';
+import 'features/walk/walk_history_screen.dart';
 import 'features/walk/walk_tracking_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -32,6 +33,7 @@ class _RootScreenState extends State<RootScreen> {
   final _screens = const [
     DashboardScreen(),
     WalkTrackingScreen(),
+    WalkHistoryScreen(),
     ChallengesScreen(),
     ProfileScreen(),
   ];
@@ -45,19 +47,28 @@ class _RootScreenState extends State<RootScreen> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.directions_walk),
+            icon: Icon(Icons.directions_walk_outlined),
+            selectedIcon: Icon(Icons.directions_walk),
             label: 'Bugün',
           ),
           NavigationDestination(
-            icon: Icon(Icons.map),
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
             label: 'Yürüyüş',
           ),
           NavigationDestination(
-            icon: Icon(Icons.flag),
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'Geçmiş',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.flag_outlined),
+            selectedIcon: Icon(Icons.flag),
             label: 'Görevler',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
             label: 'Profil',
           ),
         ],

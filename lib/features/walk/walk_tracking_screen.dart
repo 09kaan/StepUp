@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import 'walk_detail_screen.dart';
 import 'walk_history_screen.dart';
 import 'walk_tracking_controller.dart';
 
@@ -84,11 +85,24 @@ class WalkTrackingScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _WalkStat(
-                        value:
-                            '${(state.distanceMeters / 1000).toStringAsFixed(2)} km',
-                        label: 'Mesafe'),
+                      value:
+                          '${(state.distanceMeters / 1000).toStringAsFixed(2)} km',
+                      label: 'Mesafe',
+                    ),
                     _WalkStat(
-                        value: _fmt(state.elapsed), label: 'Süre'),
+                      value: _fmt(state.elapsed),
+                      label: 'Süre',
+                    ),
+                    _WalkStat(
+                      value:
+                          '${state.elevationGainMeters.toStringAsFixed(0)} m',
+                      label: 'Tırmanış',
+                    ),
+                    _WalkStat(
+                      value:
+                          '%${state.currentGradePercent.toStringAsFixed(0)}',
+                      label: 'Anlık Eğim',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -109,10 +123,9 @@ class WalkTrackingScreen extends ConsumerWidget {
                       if (state.isTracking) {
                         final s = await controller.stop();
                         if (context.mounted && s != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'Yürüyüş kaydedildi: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km'),
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => WalkDetailScreen(session: s),
                             ),
                           );
                         }
@@ -149,11 +162,11 @@ class _WalkStat extends StatelessWidget {
       children: [
         Text(value,
             style: const TextStyle(
-                fontSize: 24, fontWeight: FontWeight.w800)),
+                fontSize: 18, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
         Text(label,
             style: const TextStyle(
-                fontSize: 13, color: AppColors.textMuted)),
+                fontSize: 12, color: AppColors.textMuted)),
       ],
     );
   }

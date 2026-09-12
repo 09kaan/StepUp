@@ -50,7 +50,8 @@ class RecordsScreen extends ConsumerWidget {
             ],
           ),
           data: (r) {
-            final hasData = r.bestDaySteps > 0 || r.longestWalkKm > 0;
+            final hasData =
+                r.bestDaySteps > 0 || r.longestWalkKm > 0 || r.highestElevation > 0;
             if (!hasData) {
               return ListView(
                 children: const [
@@ -77,6 +78,10 @@ class RecordsScreen extends ConsumerWidget {
                   _date(r.longestWalkDate)),
               _Rec(Icons.timer, 'En uzun süre', _dur(r.longestWalkSeconds),
                   _date(r.longestWalkDate)),
+              if (r.highestElevation > 0)
+                _Rec(Icons.terrain, 'En çok tırmanış',
+                    '${r.highestElevation.toStringAsFixed(0)} m',
+                    _date(r.highestElevationDate)),
             ];
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),

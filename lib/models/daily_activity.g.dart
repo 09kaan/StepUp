@@ -32,23 +32,28 @@ const DailyActivitySchema = CollectionSchema(
       name: r'distanceMeters',
       type: IsarType.double,
     ),
-    r'goalReached': PropertySchema(
+    r'flightsClimbed': PropertySchema(
       id: 3,
+      name: r'flightsClimbed',
+      type: IsarType.long,
+    ),
+    r'goalReached': PropertySchema(
+      id: 4,
       name: r'goalReached',
       type: IsarType.bool,
     ),
     r'goalSteps': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'goalSteps',
       type: IsarType.long,
     ),
     r'steps': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'steps',
       type: IsarType.long,
     ),
     r'streakProtected': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'streakProtected',
       type: IsarType.bool,
     )
@@ -99,10 +104,11 @@ void _dailyActivitySerialize(
   writer.writeDouble(offsets[0], object.activeCalories);
   writer.writeDateTime(offsets[1], object.date);
   writer.writeDouble(offsets[2], object.distanceMeters);
-  writer.writeBool(offsets[3], object.goalReached);
-  writer.writeLong(offsets[4], object.goalSteps);
-  writer.writeLong(offsets[5], object.steps);
-  writer.writeBool(offsets[6], object.streakProtected);
+  writer.writeLong(offsets[3], object.flightsClimbed);
+  writer.writeBool(offsets[4], object.goalReached);
+  writer.writeLong(offsets[5], object.goalSteps);
+  writer.writeLong(offsets[6], object.steps);
+  writer.writeBool(offsets[7], object.streakProtected);
 }
 
 DailyActivity _dailyActivityDeserialize(
@@ -115,11 +121,12 @@ DailyActivity _dailyActivityDeserialize(
   object.activeCalories = reader.readDouble(offsets[0]);
   object.date = reader.readDateTime(offsets[1]);
   object.distanceMeters = reader.readDouble(offsets[2]);
-  object.goalReached = reader.readBool(offsets[3]);
-  object.goalSteps = reader.readLong(offsets[4]);
+  object.flightsClimbed = reader.readLong(offsets[3]);
+  object.goalReached = reader.readBool(offsets[4]);
+  object.goalSteps = reader.readLong(offsets[5]);
   object.id = id;
-  object.steps = reader.readLong(offsets[5]);
-  object.streakProtected = reader.readBool(offsets[6]);
+  object.steps = reader.readLong(offsets[6]);
+  object.streakProtected = reader.readBool(offsets[7]);
   return object;
 }
 
@@ -137,12 +144,14 @@ P _dailyActivityDeserializeProp<P>(
     case 2:
       return (reader.readDouble(offset)) as P;
     case 3:
-      return (reader.readBool(offset)) as P;
-    case 4:
       return (reader.readLong(offset)) as P;
+    case 4:
+      return (reader.readBool(offset)) as P;
     case 5:
       return (reader.readLong(offset)) as P;
     case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
       return (reader.readBool(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -586,6 +595,62 @@ extension DailyActivityQueryFilter
   }
 
   QueryBuilder<DailyActivity, DailyActivity, QAfterFilterCondition>
+      flightsClimbedEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'flightsClimbed',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterFilterCondition>
+      flightsClimbedGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'flightsClimbed',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterFilterCondition>
+      flightsClimbedLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'flightsClimbed',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterFilterCondition>
+      flightsClimbedBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'flightsClimbed',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterFilterCondition>
       goalReachedEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -820,6 +885,20 @@ extension DailyActivityQuerySortBy
     });
   }
 
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      sortByFlightsClimbed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flightsClimbed', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      sortByFlightsClimbedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flightsClimbed', Sort.desc);
+    });
+  }
+
   QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy> sortByGoalReached() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'goalReached', Sort.asc);
@@ -915,6 +994,20 @@ extension DailyActivityQuerySortThenBy
     });
   }
 
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      thenByFlightsClimbed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flightsClimbed', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy>
+      thenByFlightsClimbedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flightsClimbed', Sort.desc);
+    });
+  }
+
   QueryBuilder<DailyActivity, DailyActivity, QAfterSortBy> thenByGoalReached() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'goalReached', Sort.asc);
@@ -1003,6 +1096,13 @@ extension DailyActivityQueryWhereDistinct
   }
 
   QueryBuilder<DailyActivity, DailyActivity, QDistinct>
+      distinctByFlightsClimbed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'flightsClimbed');
+    });
+  }
+
+  QueryBuilder<DailyActivity, DailyActivity, QDistinct>
       distinctByGoalReached() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'goalReached');
@@ -1054,6 +1154,12 @@ extension DailyActivityQueryProperty
       distanceMetersProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'distanceMeters');
+    });
+  }
+
+  QueryBuilder<DailyActivity, int, QQueryOperations> flightsClimbedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'flightsClimbed');
     });
   }
 

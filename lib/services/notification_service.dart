@@ -23,7 +23,7 @@ class NotificationService {
     );
 
     const settings = InitializationSettings(android: android, iOS: ios);
-    await _plugin.initialize(settings: settings);
+    await _plugin.initialize(settings);
   }
 
   /// iOS/Android 13+ bildirim izni ister.
@@ -58,11 +58,11 @@ class NotificationService {
   /// Her gün aynı saatte tekrarlayan hatırlatma.
   Future<void> scheduleDailyReminder({int hour = 19, int minute = 0}) async {
     await _plugin.zonedSchedule(
-      id: dailyReminderId,
-      title: 'Bugün yürüdün mü? 🚶',
-      body: 'Serini koru ve günlük hedefini tamamla!',
-      scheduledDate: _nextInstanceOf(hour, minute),
-      notificationDetails: _details,
+      dailyReminderId,
+      'Bugün yürüdün mü? 🚶',
+      'Serini koru ve günlük hedefini tamamla!',
+      _nextInstanceOf(hour, minute),
+      _details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time, // her gün aynı saat
     );
@@ -71,10 +71,10 @@ class NotificationService {
   /// Hemen test bildirimi (butona bas, doğru çalışıyor mu gör).
   Future<void> showTestNow() async {
     await _plugin.show(
-      id: 2002,
-      title: 'Test bildirimi 🔔',
-      body: 'Bildirimler çalışıyor!',
-      notificationDetails: _details,
+      2002,
+      'Test bildirimi 🔔',
+      'Bildirimler çalışıyor!',
+      _details,
     );
   }
 

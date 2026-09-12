@@ -29,7 +29,7 @@ class ProfileRepository {
 
     for (final w in walks) {
       km += w.distanceMeters / 1000;
-      // elev += w.elevationGainMeters; // WalkSession'da bu alan tanımlanmamış
+      elev += w.elevationGainMeters;
     }
 
     final completed =

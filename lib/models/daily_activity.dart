@@ -20,6 +20,9 @@ class DailyActivity {
   // YENİ: bu gün telafi (freeze) ile korundu mu?
   bool streakProtected = false;
 
+  /// Çıkılan kat (Apple Health FLIGHTS_CLIMBED)
+  int flightsClimbed = 0;
+
   DailyActivity();
 
   DailyActivity.create({
@@ -30,5 +33,6 @@ class DailyActivity {
     this.goalSteps = 6000,
     this.goalReached = false,
     this.streakProtected = false,
+    this.flightsClimbed = 0,
   });
 }
