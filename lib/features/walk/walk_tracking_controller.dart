@@ -15,6 +15,8 @@ final locationServiceProvider =
 class WalkTrackingState {
   final bool isTracking;
   final bool isPaused;
+  final bool isManuallyPaused;
+  final bool isAutoPaused;
   final bool isRestoring;
   final bool hasRecoveredSession;
   final List<LatLng> points;
@@ -28,6 +30,8 @@ class WalkTrackingState {
   const WalkTrackingState({
     this.isTracking = false,
     this.isPaused = false,
+    this.isManuallyPaused = false,
+    this.isAutoPaused = false,
     this.isRestoring = false,
     this.hasRecoveredSession = false,
     this.points = const [],
@@ -42,6 +46,8 @@ class WalkTrackingState {
   WalkTrackingState copyWith({
     bool? isTracking,
     bool? isPaused,
+    bool? isManuallyPaused,
+    bool? isAutoPaused,
     bool? isRestoring,
     bool? hasRecoveredSession,
     List<LatLng>? points,
@@ -52,9 +58,15 @@ class WalkTrackingState {
     double? currentGradePercent,
     double? currentAltitude,
   }) {
+    final manualPaused = isManuallyPaused ?? this.isManuallyPaused;
+    final autoPaused = isAutoPaused ?? this.isAutoPaused;
+    final paused = isPaused ?? (manualPaused || autoPaused);
+
     return WalkTrackingState(
       isTracking: isTracking ?? this.isTracking,
-      isPaused: isPaused ?? this.isPaused,
+      isPaused: paused,
+      isManuallyPaused: manualPaused,
+      isAutoPaused: autoPaused,
       isRestoring: isRestoring ?? this.isRestoring,
       hasRecoveredSession:
           hasRecoveredSession ?? this.hasRecoveredSession,
@@ -84,6 +96,14 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   WalkSession? _activeSession;
   DateTime? _lastResumeAt;
   int _accumulatedMovingSeconds = 0;
+
+  // Otomatik duraklatma ve devam etme eşikleri
+  static const double autoPauseSpeed = 0.4; // m/s (~1.44 km/h)
+  static const double autoResumeSpeed = 0.8; // m/s (~2.88 km/h)
+  static const Duration autoPauseDelay = Duration(seconds: 20);
+
+  DateTime? _lowSpeedStartTime;
+  int _consecutiveResumePoints = 0;
 
   Position? _last;
   Position? _lastAltitudePos;
@@ -140,6 +160,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       state = WalkTrackingState(
         isTracking: false,
         isPaused: true,
+        isManuallyPaused: true,
+        isAutoPaused: false,
         isRestoring: false,
         hasRecoveredSession: true,
         points: mapPoints,
@@ -237,7 +259,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   }
 
   Future<void> pause() async {
-    if (!state.isTracking || state.isPaused) return;
+    if (!state.isTracking || state.isManuallyPaused) return;
 
     if (_lastResumeAt != null) {
       _accumulatedMovingSeconds +=
@@ -249,12 +271,16 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastAltitudePos = null;
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
+    _lowSpeedStartTime = null;
+    _consecutiveResumePoints = 0;
 
     await _sub?.cancel();
     _sub = null;
 
     state = state.copyWith(
       isPaused: true,
+      isManuallyPaused: true,
+      isAutoPaused: false,
       currentGradePercent: 0,
       elapsed: Duration(seconds: _accumulatedMovingSeconds),
     );
@@ -279,12 +305,16 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastAltitudePos = null;
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
+    _lowSpeedStartTime = null;
+    _consecutiveResumePoints = 0;
 
     _lastResumeAt = DateTime.now();
 
     state = state.copyWith(
       isTracking: true,
       isPaused: false,
+      isManuallyPaused: false,
+      isAutoPaused: false,
       hasRecoveredSession: false,
       error: null,
     );
@@ -314,14 +344,75 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   }
 
   void _handlePosition(Position pos) {
-    if (!state.isTracking || state.isPaused) return;
+    if (!state.isTracking || state.isManuallyPaused) return;
 
     final service = _ref.read(locationServiceProvider);
-
-    // 1. GPS Yatay Doğruluk & Mesafe Segment Filtresi:
     final isAccurate = pos.accuracy > 0 && pos.accuracy <= 20.0;
+
+    // --- DURUM 1: OTOMATİK DURAKLATILMIŞ DURUMDA DEVAM ETME (AUTO-RESUME) KONTROLÜ ---
+    if (state.isAutoPaused) {
+      if (!isAccurate) return;
+
+      if (_last == null) {
+        _last = pos;
+        return;
+      }
+
+      final dist = service.distanceBetween(
+        _last!.latitude,
+        _last!.longitude,
+        pos.latitude,
+        pos.longitude,
+      );
+      final timeDelta =
+          pos.timestamp.difference(_last!.timestamp).inMilliseconds / 1000.0;
+      final speed = timeDelta > 0 ? (dist / timeDelta) : double.infinity;
+
+      // İki ardışık geçerli noktada hız 0.8 m/s üzerine çıkarsa devam et
+      if (dist >= 2.0 && speed >= autoResumeSpeed && speed <= 7.0) {
+        _consecutiveResumePoints++;
+        _last = pos;
+
+        if (_consecutiveResumePoints >= 2) {
+          _consecutiveResumePoints = 0;
+          _lowSpeedStartTime = null;
+          _lastResumeAt = DateTime.now();
+
+          _lastAltitudePos = null;
+          _lastValidAltitude = null;
+          _altitudeBuffer.clear();
+
+          _recorded.add(RoutePoint.of(
+            pos.latitude,
+            pos.longitude,
+            pos.timestamp,
+            pos.altitude,
+            pos.altitudeAccuracy,
+          ));
+
+          state = state.copyWith(
+            isPaused: false,
+            isAutoPaused: false,
+            isManuallyPaused: false,
+            points: [...state.points, LatLng(pos.latitude, pos.longitude)],
+            distanceMeters: state.distanceMeters + dist,
+          );
+
+          checkpoint();
+        }
+      } else {
+        _consecutiveResumePoints = 0;
+        if (dist >= 2.0 && speed <= 7.0) {
+          _last = pos;
+        }
+      }
+      return;
+    }
+
+    // --- DURUM 2: NORMAL TAKİP & OTOMATİK DURAKLATMA (AUTO-PAUSE) KONTROLÜ ---
     double added = 0;
     bool acceptPoint = false;
+    double currentSpeed = 0.0;
 
     if (_last == null) {
       if (isAccurate) {
@@ -338,8 +429,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       final timeDelta =
           pos.timestamp.difference(_last!.timestamp).inMilliseconds / 1000.0;
       final speed = timeDelta > 0 ? (dist / timeDelta) : double.infinity;
+      currentSpeed = speed;
 
-      // Hız kontrolü: Maksimum 7.0 m/s (~25.2 km/s - yürüyüş/koşu için üst sınır)
       final isReasonableSpeed = speed <= 7.0;
       final isReasonableSegment = dist >= 2.0 && isReasonableSpeed;
 
@@ -349,11 +440,60 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           _last = pos;
           acceptPoint = true;
         } else if (!isReasonableSpeed) {
-          // İmkânsız hız / sıçrama tespit edildi (araç veya teleport);
-          // Mesafeye eklemeden referans noktasını güncelle ki kilitlenme olmasın
+          // İmkânsız hız / sıçrama (araç veya teleport); kilitlenmeyi önlemek için güncelle
           _last = pos;
         }
       }
+    }
+
+    // Hız 20 saniye boyunca 0.4 m/s altında kalırsa otomatik duraklat
+    if (isAccurate) {
+      if (acceptPoint) {
+        if (currentSpeed < autoPauseSpeed) {
+          _lowSpeedStartTime ??= DateTime.now();
+        } else {
+          _lowSpeedStartTime = null;
+        }
+      } else {
+        // Nokta kabul edilmedi çünkü dist < 2.0m (kullanıcı hareketsiz / duruyor)
+        _lowSpeedStartTime ??= DateTime.now();
+      }
+    }
+
+    // 20 saniye doldu mu kontrolü
+    if (_lowSpeedStartTime != null &&
+        DateTime.now().difference(_lowSpeedStartTime!) >= autoPauseDelay) {
+      if (_lastResumeAt != null) {
+        final totalSeconds =
+            DateTime.now().difference(_lastResumeAt!).inSeconds;
+        final netMoving =
+            (totalSeconds - autoPauseDelay.inSeconds).clamp(0, totalSeconds);
+        _accumulatedMovingSeconds += netMoving;
+      }
+
+      _lastResumeAt = null;
+      _last = pos;
+      _lastAltitudePos = null;
+      _lastValidAltitude = null;
+      _altitudeBuffer.clear();
+      _lowSpeedStartTime = null;
+      _consecutiveResumePoints = 0;
+
+      state = state.copyWith(
+        isPaused: true,
+        isAutoPaused: true,
+        isManuallyPaused: false,
+        currentGradePercent: 0,
+        elapsed: Duration(seconds: _accumulatedMovingSeconds),
+        points: acceptPoint
+            ? [...state.points, LatLng(pos.latitude, pos.longitude)]
+            : state.points,
+        distanceMeters: state.distanceMeters + added,
+        elevationGainMeters: _totalElevationGain,
+      );
+
+      checkpoint();
+      return;
     }
 
     if (acceptPoint) {
@@ -367,14 +507,12 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     }
 
     // 2. Yükseklik Filtresi, Smoothing ve Tırmanış Eğimi:
-    // SADECE kabul edilen geçerli rota noktaları yükseklik hesabına dahil edilir
     final hasAccurateAltitude =
         pos.altitudeAccuracy > 0 && pos.altitudeAccuracy <= 15.0;
     double newGrade = state.currentGradePercent;
     double currentDisplayAlt = state.currentAltitude;
 
     if (acceptPoint && hasAccurateAltitude) {
-      // Son 4 noktanın hareketli ortalaması (smoothing)
       _altitudeBuffer.add(pos.altitude);
       if (_altitudeBuffer.length > 4) _altitudeBuffer.removeAt(0);
       final smoothedAlt =
@@ -397,7 +535,6 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         );
         final altDiff = smoothedAlt - _lastValidAltitude!;
 
-        // 1.5m dikey ölü bölge + 5m yatay hareket şartı (dururken sahte tırmanışı önler)
         if (altDiff >= 1.5 && hDist >= 5.0) {
           _totalElevationGain += altDiff;
           _climbingDistanceMeters += hDist;
@@ -509,6 +646,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _totalElevationGain = 0;
     _climbingDistanceMeters = 0;
     _maxAltitude = null;
+    _lowSpeedStartTime = null;
+    _consecutiveResumePoints = 0;
 
     _altitudeBuffer.clear();
     _recorded.clear();

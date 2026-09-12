@@ -105,7 +105,9 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade800,
+                          color: state.isAutoPaused
+                              ? Colors.amber.shade900
+                              : Colors.orange.shade800,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
@@ -114,14 +116,22 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
                             ),
                           ],
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.pause, color: Colors.white, size: 16),
-                            SizedBox(width: 4),
+                            Icon(
+                              state.isAutoPaused
+                                  ? Icons.motion_photos_paused
+                                  : Icons.pause,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 5),
                             Text(
-                              'Duraklatıldı',
-                              style: TextStyle(
+                              state.isAutoPaused
+                                  ? 'Otomatik Duraklatıldı'
+                                  : 'Duraklatıldı',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
