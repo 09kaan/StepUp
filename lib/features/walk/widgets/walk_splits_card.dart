@@ -76,11 +76,13 @@ class WalkSplitsCard extends StatelessWidget {
         final splitDistKm = splitDistM / 1000.0;
 
         int splitSec = 0;
-        if (pCurr.time != null && splitStartPoint.time != null) {
+        if (pCurr.movingSeconds > 0 && splitStartPoint.movingSeconds >= 0) {
+          splitSec = pCurr.movingSeconds - splitStartPoint.movingSeconds;
+        } else if (pCurr.time != null && splitStartPoint.time != null) {
           splitSec = pCurr.time!.difference(splitStartPoint.time!).inSeconds;
         }
 
-        // Eğer zaman damgası eksikse orantılı tahmin yap
+        // Eğer süre eksikse orantılı tahmin yap
         if (splitSec <= 0 && totalDistanceMeters > 0) {
           splitSec = ((splitDistM / totalDistanceMeters) * totalMovingSeconds).round();
         }
@@ -109,7 +111,9 @@ class WalkSplitsCard extends StatelessWidget {
       final lastPoint = points.last;
 
       int splitSec = 0;
-      if (lastPoint.time != null && splitStartPoint.time != null) {
+      if (lastPoint.movingSeconds > 0 && splitStartPoint.movingSeconds >= 0) {
+        splitSec = lastPoint.movingSeconds - splitStartPoint.movingSeconds;
+      } else if (lastPoint.time != null && splitStartPoint.time != null) {
         splitSec = lastPoint.time!.difference(splitStartPoint.time!).inSeconds;
       }
       if (splitSec <= 0 && totalDistanceMeters > 0) {

@@ -48,34 +48,86 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
   Set<Polyline> _buildGradePolylines(List<RoutePoint> rawPoints) {
     if (rawPoints.length < 2) return {};
 
+    // 1. İrtifaları 3 noktalı hareketli ortalama ile süz (GPS dikey gürültüsünü engeller)
+    final smoothedAlts = <double>[];
+    for (int i = 0; i < rawPoints.length; i++) {
+      double sum = rawPoints[i].altitude;
+      int count = 1;
+      if (i > 0) {
+        sum += rawPoints[i - 1].altitude;
+        count++;
+      }
+      if (i < rawPoints.length - 1) {
+        sum += rawPoints[i + 1].altitude;
+        count++;
+      }
+      smoothedAlts.add(sum / count);
+    }
+
     final polylines = <Polyline>{};
+    List<LatLng> currentBatch = [LatLng(rawPoints[0].lat, rawPoints[0].lng)];
+    Color? currentColor;
+    int polylineIndex = 0;
 
     for (int i = 1; i < rawPoints.length; i++) {
       final p1 = rawPoints[i - 1];
       final p2 = rawPoints[i];
 
       final d = Geolocator.distanceBetween(p1.lat, p1.lng, p2.lat, p2.lng);
-      final altDiff = p2.altitude - p1.altitude;
-      final grade = d > 0 ? (altDiff / d) * 100 : 0.0;
+      final altDiff = smoothedAlts[i] - smoothedAlts[i - 1];
 
-      Color color;
-      if (grade < -1.0) {
-        color = const Color(0xFF3B82F6); // İniş (Mavi)
-      } else if (grade <= 3.0) {
-        color = const Color(0xFF10B981); // Düz / Çok Hafif (Yeşil)
-      } else if (grade <= 6.0) {
-        color = const Color(0xFFF59E0B); // Hafif Yokuş (Sarı)
-      } else if (grade <= 10.0) {
-        color = const Color(0xFFF97316); // Orta Yokuş (Turuncu)
-      } else {
-        color = const Color(0xFFEF4444); // Dik Yokuş (Kırmızı)
+      // Gürültü Filtresi: Çok kısa mesafeler veya düşük dikey doğrulukta eğim 0 kabul edilir
+      double grade = 0.0;
+      final isAccurate =
+          (p1.altitudeAccuracy > 0 && p1.altitudeAccuracy <= 15) &&
+              (p2.altitudeAccuracy > 0 && p2.altitudeAccuracy <= 15);
+      if (d >= 8.0 && isAccurate) {
+        grade = (altDiff / d) * 100;
       }
 
+      Color segmentColor;
+      if (grade < -1.0) {
+        segmentColor = const Color(0xFF3B82F6); // İniş (Mavi)
+      } else if (grade <= 3.0) {
+        segmentColor = const Color(0xFF10B981); // Düz / Çok Hafif (Yeşil)
+      } else if (grade <= 6.0) {
+        segmentColor = const Color(0xFFF59E0B); // Hafif Yokuş (Sarı)
+      } else if (grade <= 10.0) {
+        segmentColor = const Color(0xFFF97316); // Orta Yokuş (Turuncu)
+      } else {
+        segmentColor = const Color(0xFFEF4444); // Dik Yokuş (Kırmızı)
+      }
+
+      final pt = LatLng(p2.lat, p2.lng);
+
+      if (currentColor == null) {
+        currentColor = segmentColor;
+        currentBatch.add(pt);
+      } else if (currentColor == segmentColor) {
+        currentBatch.add(pt);
+      } else {
+        // Renk değişti: Mevcut grubu tek bir polyline olarak kaydet
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('batch_${polylineIndex++}'),
+            points: List.of(currentBatch),
+            color: currentColor,
+            width: 5,
+          ),
+        );
+        // Süreklilik için bir önceki son nokta yeni grubun ilk noktası olur
+        currentBatch = [currentBatch.last, pt];
+        currentColor = segmentColor;
+      }
+    }
+
+    // Kalan son grubu ekle
+    if (currentBatch.length >= 2 && currentColor != null) {
       polylines.add(
         Polyline(
-          polylineId: PolylineId('seg_$i'),
-          points: [LatLng(p1.lat, p1.lng), LatLng(p2.lat, p2.lng)],
-          color: color,
+          polylineId: PolylineId('batch_${polylineIndex++}'),
+          points: List.of(currentBatch),
+          color: currentColor,
           width: 5,
         ),
       );
@@ -392,7 +444,7 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
                   ),
 
                   // 5. Yükseklik Profili Grafiği
-                  ElevationProfileCard(points: _session.points),
+                  ElevationProfileCard(session: _session),
 
                   // 6. Kilometre Bölümleri (Strava Splits)
                   WalkSplitsCard(

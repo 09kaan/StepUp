@@ -390,6 +390,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
             pos.timestamp,
             pos.altitude,
             pos.altitudeAccuracy,
+            _currentMovingSeconds,
           ));
 
           state = state.copyWith(
@@ -505,6 +506,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         pos.timestamp,
         pos.altitude,
         pos.altitudeAccuracy,
+        _currentMovingSeconds,
       ));
     }
 

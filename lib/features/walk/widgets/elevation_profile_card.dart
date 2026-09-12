@@ -6,12 +6,13 @@ import '../../../models/walk_session.dart';
 import '../../../theme/app_theme.dart';
 
 class ElevationProfileCard extends StatelessWidget {
-  final List<RoutePoint> points;
+  final WalkSession session;
 
-  const ElevationProfileCard({super.key, required this.points});
+  const ElevationProfileCard({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
+    final points = session.points;
     if (points.length < 2) {
       return const SizedBox.shrink();
     }
@@ -20,8 +21,6 @@ class ElevationProfileCard extends StatelessWidget {
     final dists = <double>[0.0];
     final alts = <double>[points.first.altitude];
     double totalDistM = 0;
-    double gain = 0;
-    double loss = 0;
     double maxGrade = 0;
 
     for (int i = 1; i < points.length; i++) {
@@ -33,13 +32,7 @@ class ElevationProfileCard extends StatelessWidget {
       alts.add(p2.altitude);
 
       final diff = p2.altitude - p1.altitude;
-      if (diff > 0) {
-        gain += diff;
-      } else {
-        loss += diff.abs();
-      }
-
-      if (d >= 8.0) {
+      if (d >= 8.0 && p1.altitudeAccuracy > 0 && p2.altitudeAccuracy > 0) {
         final g = (diff / d) * 100;
         if (g > maxGrade) maxGrade = g;
       }
@@ -61,12 +54,42 @@ class ElevationProfileCard extends StatelessWidget {
       smoothedAlts.add(sum / count);
     }
 
-    double minAlt = smoothedAlts.reduce(math.min);
-    double maxAlt = smoothedAlts.reduce(math.max);
+    // Gerçek min ve maks irtifa değerleri
+    final actualMinAlt = smoothedAlts.reduce(math.min);
+    final actualMaxAlt = smoothedAlts.reduce(math.max);
 
-    // Düz yolda grafiğin tek bir düz çizgiye sıkışmaması için minimum 10m dikey aralık
-    if (maxAlt - minAlt < 10.0) {
-      maxAlt = minAlt + 10.0;
+    // Grafik ölçeği: 10m altındaki irtifa farklarında eğri ortalanarak çizilir
+    double chartMinAlt = actualMinAlt;
+    double chartMaxAlt = actualMaxAlt;
+
+    if (chartMaxAlt - chartMinAlt < 10.0) {
+      final center = (chartMaxAlt + chartMinAlt) / 2;
+      chartMinAlt = center - 5.0;
+      chartMaxAlt = center + 5.0;
+    }
+
+    // İniş hesabı: 1.5m ölü bölge + 5m yatay hareket filtresi (sahte salınımları engeller)
+    double loss = 0;
+    double lastValidAlt = points.first.altitude;
+    double lastHPosLat = points.first.lat;
+    double lastHPosLng = points.first.lng;
+
+    for (int i = 1; i < points.length; i++) {
+      final p = points[i];
+      final hDist =
+          Geolocator.distanceBetween(lastHPosLat, lastHPosLng, p.lat, p.lng);
+      final altDiff = p.altitude - lastValidAlt;
+
+      if (altDiff <= -1.5 && hDist >= 5.0) {
+        loss += altDiff.abs();
+        lastValidAlt = p.altitude;
+        lastHPosLat = p.lat;
+        lastHPosLng = p.lng;
+      } else if (altDiff >= 1.5 && hDist >= 5.0) {
+        lastValidAlt = p.altitude;
+        lastHPosLat = p.lat;
+        lastHPosLng = p.lng;
+      }
     }
 
     return Container(
@@ -118,8 +141,8 @@ class ElevationProfileCard extends StatelessWidget {
               painter: _ElevationChartPainter(
                 distances: dists,
                 altitudes: smoothedAlts,
-                minAlt: minAlt,
-                maxAlt: maxAlt,
+                minAlt: chartMinAlt,
+                maxAlt: chartMaxAlt,
                 chartColor: AppColors.brand,
               ),
             ),
@@ -132,19 +155,19 @@ class ElevationProfileCard extends StatelessWidget {
             children: [
               _MiniStat(
                 label: 'En Düşük',
-                value: '${minAlt.toStringAsFixed(0)} m',
+                value: '${actualMinAlt.toStringAsFixed(0)} m',
                 icon: Icons.arrow_downward,
                 color: Colors.blue.shade600,
               ),
               _MiniStat(
                 label: 'En Yüksek',
-                value: '${maxAlt.toStringAsFixed(0)} m',
+                value: '${actualMaxAlt.toStringAsFixed(0)} m',
                 icon: Icons.arrow_upward,
                 color: Colors.red.shade600,
               ),
               _MiniStat(
                 label: 'Çıkış',
-                value: '+${gain.toStringAsFixed(0)} m',
+                value: '+${session.elevationGainMeters.toStringAsFixed(0)} m',
                 icon: Icons.north_east,
                 color: Colors.green.shade600,
               ),
@@ -195,7 +218,6 @@ class _ElevationChartPainter extends CustomPainter {
     const bottomPadding = 20.0;
     final chartHeight = size.height - topPadding - bottomPadding;
 
-    // Kılavuz çizgileri ve sol etiketler
     final gridPaint = Paint()
       ..color = Colors.grey.withValues(alpha: 0.18)
       ..strokeWidth = 1
@@ -221,7 +243,6 @@ class _ElevationChartPainter extends CustomPainter {
       tp.paint(canvas, Offset(0, y - (tp.height / 2)));
     }
 
-    // X ekseni ve eğri noktalarını hesapla
     final startX = 32.0;
     final usableWidth = size.width - startX;
 
@@ -244,7 +265,6 @@ class _ElevationChartPainter extends CustomPainter {
       final x1 = getX(i);
       final y1 = getY(i);
 
-      // Bezier eğrisi ile yumuşak geçiş
       final cx = (x0 + x1) / 2;
       path.cubicTo(cx, y0, cx, y1, x1, y1);
       fillPath.cubicTo(cx, y0, cx, y1, x1, y1);
@@ -253,7 +273,6 @@ class _ElevationChartPainter extends CustomPainter {
     fillPath.lineTo(getX(distances.length - 1), topPadding + chartHeight);
     fillPath.close();
 
-    // Degrade dolgu
     final gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -271,7 +290,6 @@ class _ElevationChartPainter extends CustomPainter {
 
     canvas.drawPath(fillPath, fillPaint);
 
-    // Ana çizgi
     final linePaint = Paint()
       ..color = chartColor
       ..strokeWidth = 2.5
@@ -281,7 +299,6 @@ class _ElevationChartPainter extends CustomPainter {
 
     canvas.drawPath(path, linePaint);
 
-    // X ekseni etiketleri (Başlangıç ve Bitiş km)
     final tpStart = TextPainter(
       text: TextSpan(text: '0 km', style: textStyle),
       textDirection: TextDirection.ltr,

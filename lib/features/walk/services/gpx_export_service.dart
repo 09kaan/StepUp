@@ -6,9 +6,18 @@ import 'package:share_plus/share_plus.dart';
 import '../../../models/walk_session.dart';
 
 class GpxExportService {
+  static String escapeXml(String value) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+  }
+
   static String buildGpx(WalkSession session) {
     final sb = StringBuffer();
-    final title = session.displayTitle;
+    final title = escapeXml(session.displayTitle);
     final timeStr = session.startTime.toUtc().toIso8601String();
 
     sb.writeln('<?xml version="1.0" encoding="UTF-8"?>');

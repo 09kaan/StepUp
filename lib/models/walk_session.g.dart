@@ -1937,8 +1937,13 @@ const RoutePointSchema = Schema(
       name: r'lng',
       type: IsarType.double,
     ),
-    r'time': PropertySchema(
+    r'movingSeconds': PropertySchema(
       id: 4,
+      name: r'movingSeconds',
+      type: IsarType.long,
+    ),
+    r'time': PropertySchema(
+      id: 5,
       name: r'time',
       type: IsarType.dateTime,
     )
@@ -1968,7 +1973,8 @@ void _routePointSerialize(
   writer.writeDouble(offsets[1], object.altitudeAccuracy);
   writer.writeDouble(offsets[2], object.lat);
   writer.writeDouble(offsets[3], object.lng);
-  writer.writeDateTime(offsets[4], object.time);
+  writer.writeLong(offsets[4], object.movingSeconds);
+  writer.writeDateTime(offsets[5], object.time);
 }
 
 RoutePoint _routePointDeserialize(
@@ -1982,7 +1988,8 @@ RoutePoint _routePointDeserialize(
   object.altitudeAccuracy = reader.readDouble(offsets[1]);
   object.lat = reader.readDouble(offsets[2]);
   object.lng = reader.readDouble(offsets[3]);
-  object.time = reader.readDateTimeOrNull(offsets[4]);
+  object.movingSeconds = reader.readLong(offsets[4]);
+  object.time = reader.readDateTimeOrNull(offsets[5]);
   return object;
 }
 
@@ -2002,6 +2009,8 @@ P _routePointDeserializeProp<P>(
     case 3:
       return (reader.readDouble(offset)) as P;
     case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
       return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2259,6 +2268,62 @@ extension RoutePointQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<RoutePoint, RoutePoint, QAfterFilterCondition>
+      movingSecondsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'movingSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<RoutePoint, RoutePoint, QAfterFilterCondition>
+      movingSecondsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'movingSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<RoutePoint, RoutePoint, QAfterFilterCondition>
+      movingSecondsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'movingSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<RoutePoint, RoutePoint, QAfterFilterCondition>
+      movingSecondsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'movingSeconds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }

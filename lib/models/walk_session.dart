@@ -82,6 +82,7 @@ class RoutePoint {
   double altitude = 0;
   double altitudeAccuracy = 0;
   DateTime? time;
+  int movingSeconds = 0;
 
   RoutePoint();
 
@@ -91,5 +92,6 @@ class RoutePoint {
     this.time, [
     this.altitude = 0,
     this.altitudeAccuracy = 0,
+    this.movingSeconds = 0,
   ]);
 }
