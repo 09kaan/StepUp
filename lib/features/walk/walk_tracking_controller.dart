@@ -119,13 +119,24 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           );
           final timeDelta =
               pos.timestamp.difference(_last!.timestamp).inMilliseconds / 1000.0;
-          final speedReasonable = timeDelta <= 0 || (dist / timeDelta) <= 12.0; // max ~43 km/s
-          final isReasonableSegment = dist >= 2.0 && dist <= 100.0 && speedReasonable;
+          final speed = timeDelta > 0 ? (dist / timeDelta) : double.infinity;
 
-          if (isAccurate && isReasonableSegment) {
-            added = dist;
-            _last = pos;
-            acceptPoint = true;
+          // Hız kontrolü: Maksimum 7.0 m/s (~25.2 km/s - tempolu yürüyüş/koşu için güvenli üst sınır)
+          // Sabit dist <= 100 sınırı kaldırıldı; böylece ekran kapalıyken 100m'den fazla
+          // yüründüğünde rota kilitlenmez.
+          final isReasonableSpeed = speed <= 7.0;
+          final isReasonableSegment = dist >= 2.0 && isReasonableSpeed;
+
+          if (isAccurate) {
+            if (isReasonableSegment) {
+              added = dist;
+              _last = pos;
+              acceptPoint = true;
+            } else if (!isReasonableSpeed) {
+              // İmkânsız hız / sıçrama tespit edildi (araç veya teleport);
+              // Mesafeye eklemeden referans noktasını güncelle ki kilitlenme olmasın!
+              _last = pos;
+            }
           }
         }
 
@@ -140,16 +151,19 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         }
 
         // 2. Yükseklik Filtresi, Smoothing ve Tırmanış Eğimi:
+        // SADECE kabul edilen geçerli rota noktaları yükseklik hesabına dahil edilir
         final hasAccurateAltitude =
             pos.altitudeAccuracy > 0 && pos.altitudeAccuracy <= 15.0;
         double newGrade = state.currentGradePercent;
+        double currentDisplayAlt = state.currentAltitude;
 
-        if (hasAccurateAltitude) {
+        if (acceptPoint && hasAccurateAltitude) {
           // Son 4 noktanın hareketli ortalaması (smoothing)
           _altitudeBuffer.add(pos.altitude);
           if (_altitudeBuffer.length > 4) _altitudeBuffer.removeAt(0);
           final smoothedAlt =
               _altitudeBuffer.reduce((a, b) => a + b) / _altitudeBuffer.length;
+          currentDisplayAlt = smoothedAlt;
 
           if (_maxAltitude == null || smoothedAlt > _maxAltitude!) {
             _maxAltitude = smoothedAlt;
@@ -193,7 +207,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           distanceMeters: state.distanceMeters + added,
           elevationGainMeters: _totalElevationGain,
           currentGradePercent: newGrade,
-          currentAltitude: pos.altitude,
+          currentAltitude: currentDisplayAlt,
         );
       },
       onError: (error) {
