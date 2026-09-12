@@ -107,6 +107,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
   DateTime? _lowSpeedStartTime;
   int _consecutiveResumePoints = 0;
+  double _pendingResumeDistance = 0;
+  final List<RoutePoint> _pendingResumePoints = [];
 
   Position? _last;
   Position? _lastAltitudePos;
@@ -278,6 +280,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _altitudeBuffer.clear();
     _lowSpeedStartTime = null;
     _consecutiveResumePoints = 0;
+    _pendingResumeDistance = 0;
+    _pendingResumePoints.clear();
 
     await _sub?.cancel();
     _sub = null;
@@ -312,6 +316,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _altitudeBuffer.clear();
     _lowSpeedStartTime = null;
     _consecutiveResumePoints = 0;
+    _pendingResumeDistance = 0;
+    _pendingResumePoints.clear();
 
     _lastResumeAt = DateTime.now();
 
@@ -392,10 +398,22 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       // İki ardışık geçerli noktada hız 0.8 m/s üzerine çıkarsa devam et
       if (dist >= 2.0 && speed >= autoResumeSpeed && speed <= 7.0) {
         _consecutiveResumePoints++;
+        _pendingResumeDistance += dist;
+
+        _pendingResumePoints.add(
+          RoutePoint.of(
+            pos.latitude,
+            pos.longitude,
+            pos.timestamp,
+            pos.altitude,
+            pos.altitudeAccuracy,
+            _accumulatedMovingSeconds,
+          ),
+        );
+
         _last = pos;
 
         if (_consecutiveResumePoints >= 2) {
-          _consecutiveResumePoints = 0;
           _lowSpeedStartTime = null;
           _lastResumeAt = DateTime.now();
 
@@ -403,22 +421,25 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           _lastValidAltitude = null;
           _altitudeBuffer.clear();
 
-          _recorded.add(RoutePoint.of(
-            pos.latitude,
-            pos.longitude,
-            pos.timestamp,
-            pos.altitude,
-            pos.altitudeAccuracy,
-            _currentMovingSeconds,
-          ));
+          _recorded.addAll(_pendingResumePoints);
 
           state = state.copyWith(
             isPaused: false,
             isAutoPaused: false,
             isManuallyPaused: false,
-            points: [...state.points, LatLng(pos.latitude, pos.longitude)],
-            distanceMeters: state.distanceMeters + dist,
+            points: [
+              ...state.points,
+              ..._pendingResumePoints.map(
+                (p) => LatLng(p.lat, p.lng),
+              ),
+            ],
+            distanceMeters:
+                state.distanceMeters + _pendingResumeDistance,
           );
+
+          _pendingResumeDistance = 0;
+          _pendingResumePoints.clear();
+          _consecutiveResumePoints = 0;
 
           unawaited(
             _setGpsPowerMode(GpsPowerMode.active),
@@ -428,6 +449,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         }
       } else {
         _consecutiveResumePoints = 0;
+        _pendingResumeDistance = 0;
+        _pendingResumePoints.clear();
         if (dist >= 2.0 && speed <= 7.0) {
           _last = pos;
         }
@@ -504,6 +527,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       _altitudeBuffer.clear();
       _lowSpeedStartTime = null;
       _consecutiveResumePoints = 0;
+      _pendingResumeDistance = 0;
+      _pendingResumePoints.clear();
 
       state = state.copyWith(
         isPaused: true,
@@ -679,6 +704,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _maxAltitude = null;
     _lowSpeedStartTime = null;
     _consecutiveResumePoints = 0;
+    _pendingResumeDistance = 0;
+    _pendingResumePoints.clear();
     _gpsPowerMode = GpsPowerMode.active;
     _isSwitchingGpsMode = false;
 
