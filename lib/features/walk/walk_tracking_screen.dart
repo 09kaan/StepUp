@@ -7,8 +7,35 @@ import 'walk_detail_screen.dart';
 import 'walk_history_screen.dart';
 import 'walk_tracking_controller.dart';
 
-class WalkTrackingScreen extends ConsumerWidget {
+class WalkTrackingScreen extends ConsumerStatefulWidget {
   const WalkTrackingScreen({super.key});
+
+  @override
+  ConsumerState<WalkTrackingScreen> createState() => _WalkTrackingScreenState();
+}
+
+class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+    if (lifecycleState == AppLifecycleState.inactive ||
+        lifecycleState == AppLifecycleState.paused ||
+        lifecycleState == AppLifecycleState.detached) {
+      ref.read(walkTrackingControllerProvider.notifier).checkpoint();
+    }
+  }
 
   String _fmt(Duration d) {
     final h = d.inHours.toString().padLeft(2, '0');
@@ -18,7 +45,7 @@ class WalkTrackingScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(walkTrackingControllerProvider);
     final controller = ref.read(walkTrackingControllerProvider.notifier);
 
@@ -50,23 +77,61 @@ class WalkTrackingScreen extends ConsumerWidget {
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(28)),
-              child: AppleMap(
-                initialCameraPosition:
-                    CameraPosition(target: center, zoom: 16),
-                myLocationEnabled: true,
-                trackingMode: state.isTracking
-                    ? TrackingMode.follow
-                    : TrackingMode.none,
-                polylines: mapPoints.length >= 2
-                    ? {
-                        Polyline(
-                          polylineId: PolylineId('route'),
-                          points: mapPoints,
-                          color: Colors.blue,
-                          width: 5,
+              child: Stack(
+                children: [
+                  AppleMap(
+                    initialCameraPosition:
+                        CameraPosition(target: center, zoom: 16),
+                    myLocationEnabled: true,
+                    trackingMode: state.isTracking
+                        ? TrackingMode.follow
+                        : TrackingMode.none,
+                    polylines: mapPoints.length >= 2
+                        ? {
+                            Polyline(
+                              polylineId: PolylineId('route'),
+                              points: mapPoints,
+                              color: Colors.blue,
+                              width: 5,
+                            ),
+                          }
+                        : <Polyline>{},
+                  ),
+                  if (state.isPaused && !state.hasRecoveredSession)
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade800,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 6,
+                            ),
+                          ],
                         ),
-                      }
-                    : <Polyline>{},
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.pause, color: Colors.white, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Duraklatıldı',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -75,11 +140,96 @@ class WalkTrackingScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (state.hasRecoveredSession) ...[
+                  Card(
+                    color: Colors.orange.shade50,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: Colors.orange.shade200),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.restore, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Yarım kalan yürüyüş bulundu',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${(state.distanceMeters / 1000).toStringAsFixed(2)} km'
+                            ' • ${state.elapsed.inMinutes} dk (${state.points.length} GPS noktası)',
+                            style: TextStyle(
+                              color: Colors.orange.shade900,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: controller.discardRecoveredWalk,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red.shade700,
+                                  ),
+                                  child: const Text('Sil'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    final session = await controller.stop();
+                                    if (context.mounted && session != null) {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              WalkDetailScreen(session: session),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: const Text('Bitir'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: controller.resume,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.brand,
+                                  ),
+                                  child: const Text('Devam Et'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (state.error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(state.error!,
-                        style: const TextStyle(color: Colors.red)),
+                    child: Text(
+                      state.error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -106,41 +256,106 @@ class WalkTrackingScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: state.isTracking
-                          ? Colors.red.shade600
-                          : AppColors.brand,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28)),
-                      textStyle: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    onPressed: () async {
-                      if (state.isTracking) {
-                        final s = await controller.stop();
-                        if (context.mounted && s != null) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => WalkDetailScreen(session: s),
+                if (!state.hasRecoveredSession)
+                  if (state.isTracking || state.isPaused)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                if (state.isPaused) {
+                                  controller.resume();
+                                } else {
+                                  controller.pause();
+                                }
+                              },
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                                side: BorderSide(
+                                  color: state.isPaused
+                                      ? AppColors.brand
+                                      : Colors.orange.shade700,
+                                  width: 2,
+                                ),
+                              ),
+                              icon: Icon(
+                                state.isPaused
+                                    ? Icons.play_arrow
+                                    : Icons.pause,
+                                color: state.isPaused
+                                    ? AppColors.brand
+                                    : Colors.orange.shade700,
+                              ),
+                              label: Text(
+                                state.isPaused ? 'Devam Et' : 'Duraklat',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: state.isPaused
+                                      ? AppColors.brand
+                                      : Colors.orange.shade700,
+                                ),
+                              ),
                             ),
-                          );
-                        }
-                      } else {
-                        controller.start();
-                      }
-                    },
-                    icon: Icon(state.isTracking
-                        ? Icons.stop
-                        : Icons.play_arrow),
-                    label: Text(state.isTracking
-                        ? 'Yürüyüşü Bitir'
-                        : 'Yürüyüşü Başlat'),
-                  ),
-                ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                final session = await controller.stop();
+                                if (context.mounted && session != null) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          WalkDetailScreen(session: session),
+                                    ),
+                                  );
+                                }
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red.shade600,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              icon: const Icon(Icons.stop),
+                              label: const Text('Bitir'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.brand,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onPressed: controller.start,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Yürüyüşü Başlat'),
+                      ),
+                    ),
               ],
             ),
           ),
