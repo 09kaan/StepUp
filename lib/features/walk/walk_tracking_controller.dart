@@ -65,8 +65,11 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   DateTime? _startTime;
   Position? _last;
   Position? _lastAltitudePos;
+  double? _lastValidAltitude;
   double _totalElevationGain = 0;
-  double _maxAltitude = 0;
+  double _climbingDistanceMeters = 0;
+  double? _maxAltitude;
+  final List<double> _altitudeBuffer = [];
   final List<RoutePoint> _recorded = [];
 
   Future<void> start() async {
@@ -80,8 +83,11 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _startTime = DateTime.now();
     _last = null;
     _lastAltitudePos = null;
+    _lastValidAltitude = null;
     _totalElevationGain = 0;
-    _maxAltitude = 0;
+    _climbingDistanceMeters = 0;
+    _maxAltitude = null;
+    _altitudeBuffer.clear();
     _recorded.clear();
     state = const WalkTrackingState(isTracking: true);
 
@@ -92,69 +98,109 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       }
     });
 
-    _sub = service.positionStream().listen((pos) {
-      double added = 0;
-      if (_last != null) {
-        added = service.distanceBetween(
-            _last!.latitude, _last!.longitude, pos.latitude, pos.longitude);
-      }
-      _last = pos;
-      _recorded.add(RoutePoint.of(
-        pos.latitude,
-        pos.longitude,
-        DateTime.now(),
-        pos.altitude,
-        pos.altitudeAccuracy,
-      ));
+    _sub = service.positionStream().listen(
+      (pos) {
+        // 1. GPS Yatay Doğruluk & Mesafe Segment Filtresi:
+        final isAccurate = pos.accuracy > 0 && pos.accuracy <= 20.0;
+        double added = 0;
+        bool acceptPoint = false;
 
-      // GPS Yükseklik & Eğim Filtresi:
-      // Dikey doğruluk: 15 metrenin altı (veya 0 ise cihaz desteklemiyordur)
-      final hasAccurateAltitude = pos.altitudeAccuracy <= 15.0;
-      double newGrade = state.currentGradePercent;
-
-      if (hasAccurateAltitude) {
-        if (_lastAltitudePos == null) {
-          _lastAltitudePos = pos;
-          _maxAltitude = pos.altitude;
+        if (_last == null) {
+          if (isAccurate) {
+            _last = pos;
+            acceptPoint = true;
+          }
         } else {
-          final hDist = service.distanceBetween(
-            _lastAltitudePos!.latitude,
-            _lastAltitudePos!.longitude,
+          final dist = service.distanceBetween(
+            _last!.latitude,
+            _last!.longitude,
             pos.latitude,
             pos.longitude,
           );
-          final altDiff = pos.altitude - _lastAltitudePos!.altitude;
+          final timeDelta =
+              pos.timestamp.difference(_last!.timestamp).inMilliseconds / 1000.0;
+          final speedReasonable = timeDelta <= 0 || (dist / timeDelta) <= 12.0; // max ~43 km/s
+          final isReasonableSegment = dist >= 2.0 && dist <= 100.0 && speedReasonable;
 
-          if (pos.altitude > _maxAltitude) {
-            _maxAltitude = pos.altitude;
-          }
-
-          // 1.5 metrelik gürültü eşiği (deadband):
-          if (altDiff >= 1.5) {
-            _totalElevationGain += altDiff;
-            if (hDist > 0) {
-              newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
-            }
-            _lastAltitudePos = pos;
-          } else if (altDiff <= -1.5 && hDist >= 5.0) {
-            newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
-            _lastAltitudePos = pos;
-          } else if (hDist >= 25.0) {
-            // Düz yolda uzun süre yüründüğünde anlık eğimi güncelle
-            newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
-            _lastAltitudePos = pos;
+          if (isAccurate && isReasonableSegment) {
+            added = dist;
+            _last = pos;
+            acceptPoint = true;
           }
         }
-      }
 
-      state = state.copyWith(
-        points: [...state.points, LatLng(pos.latitude, pos.longitude)],
-        distanceMeters: state.distanceMeters + added,
-        elevationGainMeters: _totalElevationGain,
-        currentGradePercent: newGrade,
-        currentAltitude: pos.altitude,
-      );
-    });
+        if (acceptPoint) {
+          _recorded.add(RoutePoint.of(
+            pos.latitude,
+            pos.longitude,
+            pos.timestamp,
+            pos.altitude,
+            pos.altitudeAccuracy,
+          ));
+        }
+
+        // 2. Yükseklik Filtresi, Smoothing ve Tırmanış Eğimi:
+        final hasAccurateAltitude =
+            pos.altitudeAccuracy > 0 && pos.altitudeAccuracy <= 15.0;
+        double newGrade = state.currentGradePercent;
+
+        if (hasAccurateAltitude) {
+          // Son 4 noktanın hareketli ortalaması (smoothing)
+          _altitudeBuffer.add(pos.altitude);
+          if (_altitudeBuffer.length > 4) _altitudeBuffer.removeAt(0);
+          final smoothedAlt =
+              _altitudeBuffer.reduce((a, b) => a + b) / _altitudeBuffer.length;
+
+          if (_maxAltitude == null || smoothedAlt > _maxAltitude!) {
+            _maxAltitude = smoothedAlt;
+          }
+
+          if (_lastAltitudePos == null || _lastValidAltitude == null) {
+            _lastAltitudePos = pos;
+            _lastValidAltitude = smoothedAlt;
+          } else {
+            final hDist = service.distanceBetween(
+              _lastAltitudePos!.latitude,
+              _lastAltitudePos!.longitude,
+              pos.latitude,
+              pos.longitude,
+            );
+            final altDiff = smoothedAlt - _lastValidAltitude!;
+
+            // 1.5m dikey ölü bölge + 5m yatay hareket şartı (dururken sahte tırmanışı önler)
+            if (altDiff >= 1.5 && hDist >= 5.0) {
+              _totalElevationGain += altDiff;
+              _climbingDistanceMeters += hDist;
+              newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
+              _lastAltitudePos = pos;
+              _lastValidAltitude = smoothedAlt;
+            } else if (altDiff <= -1.5 && hDist >= 5.0) {
+              newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
+              _lastAltitudePos = pos;
+              _lastValidAltitude = smoothedAlt;
+            } else if (hDist >= 25.0) {
+              newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
+              _lastAltitudePos = pos;
+              _lastValidAltitude = smoothedAlt;
+            }
+          }
+        }
+
+        state = state.copyWith(
+          points: acceptPoint
+              ? [...state.points, LatLng(pos.latitude, pos.longitude)]
+              : state.points,
+          distanceMeters: state.distanceMeters + added,
+          elevationGainMeters: _totalElevationGain,
+          currentGradePercent: newGrade,
+          currentAltitude: pos.altitude,
+        );
+      },
+      onError: (error) {
+        state = state.copyWith(
+            error: 'Konum alınamadı. GPS ayarlarını kontrol et.');
+      },
+    );
   }
 
   Future<WalkSession?> stop() async {
@@ -168,17 +214,19 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       return null;
     }
 
-    final avgGrade = (state.distanceMeters > 0 && _totalElevationGain > 0)
-        ? ((_totalElevationGain / state.distanceMeters) * 100).clamp(0.0, 30.0)
-        : 0.0;
+    // Gerçek ortalama tırmanış eğimi: Yalnızca yokuş yukarı tırmanılan segmentlerin mesafesi baz alınır
+    final avgClimbingGrade =
+        (_climbingDistanceMeters > 0 && _totalElevationGain > 0)
+            ? ((_totalElevationGain / _climbingDistanceMeters) * 100).clamp(0.0, 35.0)
+            : 0.0;
 
     final session = WalkSession()
       ..startTime = _startTime!
       ..endTime = DateTime.now()
       ..distanceMeters = state.distanceMeters
       ..elevationGainMeters = _totalElevationGain
-      ..avgGradePercent = avgGrade
-      ..maxAltitude = _maxAltitude
+      ..avgGradePercent = avgClimbingGrade
+      ..maxAltitude = _maxAltitude ?? 0
       ..points = List.of(_recorded);
 
     final isar = _ref.read(isarProvider); // user note applied
@@ -188,7 +236,11 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     });
 
     _startTime = null;
+    _last = null;
     _lastAltitudePos = null;
+    _lastValidAltitude = null;
+    _maxAltitude = null;
+    _altitudeBuffer.clear();
     state = const WalkTrackingState();
     return session;
   }

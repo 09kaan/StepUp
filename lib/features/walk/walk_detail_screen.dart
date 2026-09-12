@@ -72,8 +72,11 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
         _session.title = newTitle;
         await isar.walkSessions.put(_session);
       });
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     }
+    ctrl.dispose();
   }
 
   Future<void> _confirmDelete() async {
@@ -282,7 +285,7 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _MetricTile(
-                        label: 'Ort. Eğim',
+                        label: 'Çıkış Eğimi',
                         value: '%${_session.avgGradePercent.toStringAsFixed(1)}',
                         icon: Icons.trending_up,
                       ),
