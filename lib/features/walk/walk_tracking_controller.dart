@@ -97,6 +97,9 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   DateTime? _lastResumeAt;
   int _accumulatedMovingSeconds = 0;
 
+  GpsPowerMode _gpsPowerMode = GpsPowerMode.active;
+  bool _isSwitchingGpsMode = false;
+
   // Otomatik duraklatma ve devam etme eşikleri
   static const double autoPauseSpeed = 0.4; // m/s (~1.44 km/h)
   static const double autoResumeSpeed = 0.8; // m/s (~2.88 km/h)
@@ -217,7 +220,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
     _startCheckpointTimer();
     _startElapsedTimer();
-    _startLocationStream();
+    await _setGpsPowerMode(GpsPowerMode.active);
   }
 
   void _startElapsedTimer() {
@@ -321,22 +324,38 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       error: null,
     );
 
-    _startLocationStream();
     _startElapsedTimer();
     _startCheckpointTimer();
+    await _setGpsPowerMode(GpsPowerMode.active);
 
     await checkpoint();
   }
 
-  Future<void> _startLocationStream() async {
-    await _sub?.cancel();
+  Future<void> _setGpsPowerMode(GpsPowerMode mode) async {
+    if (_gpsPowerMode == mode && _sub != null) return;
+    if (_isSwitchingGpsMode) return;
 
-    final service = _ref.read(locationServiceProvider);
+    _isSwitchingGpsMode = true;
 
-    _sub = service.positionStream().listen(
-      _handlePosition,
-      onError: _handleLocationError,
-    );
+    try {
+      await _sub?.cancel();
+      _sub = null;
+
+      _gpsPowerMode = mode;
+
+      final locationService = _ref.read(locationServiceProvider);
+
+      _sub = locationService
+          .positionStream(mode: mode)
+          .listen(
+            _handlePosition,
+            onError: (Object error, StackTrace stackTrace) {
+              _handleLocationError(error);
+            },
+          );
+    } finally {
+      _isSwitchingGpsMode = false;
+    }
   }
 
   void _handleLocationError(dynamic error) {
@@ -399,6 +418,10 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
             isManuallyPaused: false,
             points: [...state.points, LatLng(pos.latitude, pos.longitude)],
             distanceMeters: state.distanceMeters + dist,
+          );
+
+          unawaited(
+            _setGpsPowerMode(GpsPowerMode.active),
           );
 
           checkpoint();
@@ -496,6 +519,9 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       );
 
       checkpoint();
+      unawaited(
+        _setGpsPowerMode(GpsPowerMode.autoPaused),
+      );
       return;
     }
 
@@ -653,6 +679,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _maxAltitude = null;
     _lowSpeedStartTime = null;
     _consecutiveResumePoints = 0;
+    _gpsPowerMode = GpsPowerMode.active;
+    _isSwitchingGpsMode = false;
 
     _altitudeBuffer.clear();
     _recorded.clear();
