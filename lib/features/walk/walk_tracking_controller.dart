@@ -227,12 +227,86 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
   void _startElapsedTimer() {
     _timer?.cancel();
+
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!state.isTracking || state.isPaused) return;
-      state = state.copyWith(
-        elapsed: Duration(seconds: _currentMovingSeconds),
-      );
+      if (!state.isTracking) return;
+
+      if (!state.isPaused) {
+        state = state.copyWith(
+          elapsed: Duration(seconds: _currentMovingSeconds),
+        );
+
+        _checkAutoPauseTimeout();
+      }
     });
+  }
+
+  void _checkAutoPauseTimeout() {
+    final lowSpeedStart = _lowSpeedStartTime;
+
+    if (lowSpeedStart == null ||
+        !state.isTracking ||
+        state.isPaused ||
+        state.isManuallyPaused) {
+      return;
+    }
+
+    final stationaryDuration =
+        DateTime.now().difference(lowSpeedStart);
+
+    if (stationaryDuration < autoPauseDelay) {
+      return;
+    }
+
+    unawaited(_triggerAutoPause());
+  }
+
+  Future<void> _triggerAutoPause() async {
+    if (!state.isTracking ||
+        state.isPaused ||
+        state.isManuallyPaused) {
+      return;
+    }
+
+    final lowSpeedStart = _lowSpeedStartTime;
+
+    if (lowSpeedStart == null) {
+      return;
+    }
+
+    if (_lastResumeAt != null) {
+      final movingUntilStopped =
+          lowSpeedStart.difference(_lastResumeAt!).inSeconds;
+
+      _accumulatedMovingSeconds += movingUntilStopped.clamp(
+        0,
+        DateTime.now().difference(_lastResumeAt!).inSeconds,
+      );
+    }
+
+    _lastResumeAt = null;
+    _lastAltitudePos = null;
+    _lastValidAltitude = null;
+    _altitudeBuffer.clear();
+
+    _lowSpeedStartTime = null;
+    _consecutiveResumePoints = 0;
+    _pendingResumeDistance = 0;
+    _pendingResumePoints.clear();
+
+    state = state.copyWith(
+      isPaused: true,
+      isAutoPaused: true,
+      isManuallyPaused: false,
+      currentGradePercent: 0,
+      elapsed: Duration(
+        seconds: _accumulatedMovingSeconds,
+      ),
+      elevationGainMeters: _totalElevationGain,
+    );
+
+    await checkpoint();
+    await _setGpsPowerMode(GpsPowerMode.autoPaused);
   }
 
   void _startCheckpointTimer() {
@@ -509,46 +583,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       }
     }
 
-    // 20 saniye doldu mu kontrolü
-    if (_lowSpeedStartTime != null &&
-        DateTime.now().difference(_lowSpeedStartTime!) >= autoPauseDelay) {
-      if (_lastResumeAt != null) {
-        final totalSeconds =
-            DateTime.now().difference(_lastResumeAt!).inSeconds;
-        final netMoving =
-            (totalSeconds - autoPauseDelay.inSeconds).clamp(0, totalSeconds);
-        _accumulatedMovingSeconds += netMoving;
-      }
-
-      _lastResumeAt = null;
-      _last = pos;
-      _lastAltitudePos = null;
-      _lastValidAltitude = null;
-      _altitudeBuffer.clear();
-      _lowSpeedStartTime = null;
-      _consecutiveResumePoints = 0;
-      _pendingResumeDistance = 0;
-      _pendingResumePoints.clear();
-
-      state = state.copyWith(
-        isPaused: true,
-        isAutoPaused: true,
-        isManuallyPaused: false,
-        currentGradePercent: 0,
-        elapsed: Duration(seconds: _accumulatedMovingSeconds),
-        points: acceptPoint
-            ? [...state.points, LatLng(pos.latitude, pos.longitude)]
-            : state.points,
-        distanceMeters: state.distanceMeters + added,
-        elevationGainMeters: _totalElevationGain,
-      );
-
-      checkpoint();
-      unawaited(
-        _setGpsPowerMode(GpsPowerMode.autoPaused),
-      );
-      return;
-    }
+    _checkAutoPauseTimeout();
+    if (state.isPaused) return;
 
     if (acceptPoint) {
       _recorded.add(RoutePoint.of(
