@@ -69,6 +69,21 @@ class WalkSession {
   }
 
   @ignore
+  double get averageSpeedKmh {
+    if (distanceMeters <= 0 || durationSeconds <= 0) {
+      return 0;
+    }
+
+    return (distanceMeters / durationSeconds) * 3.6;
+  }
+
+  @ignore
+  String get averageSpeedFormatted {
+    if (averageSpeedKmh <= 0) return '-';
+    return '${averageSpeedKmh.toStringAsFixed(1)} km/sa';
+  }
+
+  @ignore
   double get caloriesEstimated {
     final km = distanceMeters / 1000;
     return (km * 55) + (elevationGainMeters * 0.1);

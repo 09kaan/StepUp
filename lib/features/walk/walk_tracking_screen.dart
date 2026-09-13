@@ -54,6 +54,22 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
         .map((p) => LatLng(p.latitude, p.longitude))
         .toList();
 
+    final averageSpeedKmh =
+        state.distanceMeters > 0 && state.elapsed.inSeconds > 0
+            ? (state.distanceMeters / state.elapsed.inSeconds) * 3.6
+            : 0.0;
+
+    final paceFormatted = () {
+      if (state.distanceMeters <= 0 || state.elapsed.inSeconds <= 0) {
+        return '-';
+      }
+      final paceSecPerKm =
+          (state.elapsed.inSeconds / (state.distanceMeters / 1000)).round();
+      final m = paceSecPerKm ~/ 60;
+      final s = paceSecPerKm % 60;
+      return "$m'${s.toString().padLeft(2, '0')}\"/km";
+    }();
+
     final center = mapPoints.isNotEmpty
         ? mapPoints.last
         : const LatLng(41.0082, 28.9784);
@@ -242,26 +258,52 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
                     ),
                   ),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _WalkStat(
-                      value:
-                          '${(state.distanceMeters / 1000).toStringAsFixed(2)} km',
-                      label: 'Mesafe',
+                    Expanded(
+                      child: _WalkStat(
+                        value:
+                            '${(state.distanceMeters / 1000).toStringAsFixed(2)} km',
+                        label: 'Mesafe',
+                      ),
                     ),
-                    _WalkStat(
-                      value: _fmt(state.elapsed),
-                      label: 'Süre',
+                    Expanded(
+                      child: _WalkStat(
+                        value: _fmt(state.elapsed),
+                        label: 'Süre',
+                      ),
                     ),
-                    _WalkStat(
-                      value:
-                          '${state.elevationGainMeters.toStringAsFixed(0)} m',
-                      label: 'Tırmanış',
+                    Expanded(
+                      child: _WalkStat(
+                        value: averageSpeedKmh > 0
+                            ? '${averageSpeedKmh.toStringAsFixed(1)} km/sa'
+                            : '-',
+                        label: 'Ort. Hız',
+                      ),
                     ),
-                    _WalkStat(
-                      value:
-                          '%${state.currentGradePercent.toStringAsFixed(0)}',
-                      label: 'Anlık Eğim',
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _WalkStat(
+                        value: paceFormatted,
+                        label: 'Ort. Tempo',
+                      ),
+                    ),
+                    Expanded(
+                      child: _WalkStat(
+                        value:
+                            '${state.elevationGainMeters.toStringAsFixed(0)} m',
+                        label: 'Tırmanış',
+                      ),
+                    ),
+                    Expanded(
+                      child: _WalkStat(
+                        value:
+                            '%${state.currentGradePercent.toStringAsFixed(0)}',
+                        label: 'Anlık Eğim',
+                      ),
                     ),
                   ],
                 ),
@@ -385,13 +427,24 @@ class _WalkStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
             style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w800)),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 12, color: AppColors.textMuted)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textMuted,
+          ),
+        ),
       ],
     );
   }

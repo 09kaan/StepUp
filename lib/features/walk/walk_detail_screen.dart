@@ -250,6 +250,12 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
 
     final polylines = _buildGradePolylines(_session.points);
 
+    final totalElapsedSeconds = _session.endTime != null
+        ? _session.endTime!.difference(_session.startTime).inSeconds
+        : _session.durationSeconds;
+    final pausedSeconds =
+        (totalElapsedSeconds - _session.durationSeconds).clamp(0, 86400 * 7);
+
     return Scaffold(
       appBar: AppBar(
         title: GestureDetector(
@@ -373,7 +379,7 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Temel 6 Metrik Kutusu
+                  // 1. Sıra: Mesafe, Hareket Süresi, Ortalama Tempo
                   Row(
                     children: [
                       Expanded(
@@ -387,7 +393,7 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _MetricTile(
-                          label: 'Süre',
+                          label: 'Hareket Süresi',
                           value: _formatDuration(_session.durationSeconds),
                           icon: Icons.timer,
                         ),
@@ -403,8 +409,17 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // 2. Sıra: Ortalama Hız, Tırmanış, Çıkış Eğimi
                   Row(
                     children: [
+                      Expanded(
+                        child: _MetricTile(
+                          label: 'Ort. Hız',
+                          value: _session.averageSpeedFormatted,
+                          icon: Icons.speed,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _MetricTile(
                           label: 'Tırmanış',
@@ -422,13 +437,36 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
                           icon: Icons.trending_up,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 3. Sıra: Kalori, Maksimum Rakım, Duraklama Süresi
+                  Row(
+                    children: [
                       Expanded(
                         child: _MetricTile(
                           label: 'Kalori',
                           value:
                               '${_session.caloriesEstimated.toStringAsFixed(0)} kcal',
                           icon: Icons.local_fire_department,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _MetricTile(
+                          label: 'Maks. Rakım',
+                          value: _session.maxAltitude > 0
+                              ? '${_session.maxAltitude.toStringAsFixed(0)} m'
+                              : '-',
+                          icon: Icons.landscape,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _MetricTile(
+                          label: 'Duraklama',
+                          value: _formatDuration(pausedSeconds),
+                          icon: Icons.pause_circle_outline,
                         ),
                       ),
                     ],
