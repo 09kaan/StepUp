@@ -104,8 +104,10 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   static const double autoPauseSpeed = 0.4; // m/s (~1.44 km/h)
   static const double autoResumeSpeed = 0.8; // m/s (~2.88 km/h)
   static const Duration autoPauseDelay = Duration(seconds: 20);
+  static const Duration noLocationAutoPauseDelay = Duration(seconds: 30);
 
   DateTime? _lowSpeedStartTime;
+  DateTime? _lastAccuratePositionAt;
   int _consecutiveResumePoints = 0;
   double _pendingResumeDistance = 0;
   final List<RoutePoint> _pendingResumePoints = [];
@@ -217,6 +219,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _activeSession = session;
     _accumulatedMovingSeconds = 0;
     _lastResumeAt = DateTime.now();
+    _lastAccuratePositionAt = DateTime.now();
 
     state = const WalkTrackingState(isTracking: true);
 
@@ -242,19 +245,19 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   }
 
   void _checkAutoPauseTimeout() {
-    final lowSpeedStart = _lowSpeedStartTime;
-
-    if (lowSpeedStart == null ||
-        !state.isTracking ||
+    if (!state.isTracking ||
         state.isPaused ||
         state.isManuallyPaused) {
       return;
     }
 
-    final stationaryDuration =
-        DateTime.now().difference(lowSpeedStart);
+    final now = DateTime.now();
+    final lowSpeedExpired = _lowSpeedStartTime != null &&
+        now.difference(_lowSpeedStartTime!) >= autoPauseDelay;
+    final noLocationUpdateExpired = _lastAccuratePositionAt != null &&
+        now.difference(_lastAccuratePositionAt!) >= noLocationAutoPauseDelay;
 
-    if (stationaryDuration < autoPauseDelay) {
+    if (!lowSpeedExpired && !noLocationUpdateExpired) {
       return;
     }
 
@@ -265,10 +268,6 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     if (!state.isTracking ||
         state.isPaused ||
         state.isManuallyPaused) {
-      return;
-    }
-
-    if (_lowSpeedStartTime == null) {
       return;
     }
 
@@ -285,6 +284,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _altitudeBuffer.clear();
 
     _lowSpeedStartTime = null;
+    _lastAccuratePositionAt = null;
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
@@ -348,6 +348,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
     _lowSpeedStartTime = null;
+    _lastAccuratePositionAt = null;
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
@@ -384,6 +385,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
     _lowSpeedStartTime = null;
+    _lastAccuratePositionAt = DateTime.now();
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
@@ -444,6 +446,9 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
     final service = _ref.read(locationServiceProvider);
     final isAccurate = pos.accuracy > 0 && pos.accuracy <= 20.0;
+    if (isAccurate) {
+      _lastAccuratePositionAt = DateTime.now();
+    }
 
     // --- DURUM 1: OTOMATİK DURAKLATILMIŞ DURUMDA DEVAM ETME (AUTO-RESUME) KONTROLÜ ---
     if (state.isAutoPaused) {
@@ -485,6 +490,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         if (_consecutiveResumePoints >= 2) {
           _lowSpeedStartTime = null;
           _lastResumeAt = DateTime.now();
+          _lastAccuratePositionAt = DateTime.now();
 
           _lastAltitudePos = null;
           _lastValidAltitude = null;
@@ -734,6 +740,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _climbingDistanceMeters = 0;
     _maxAltitude = null;
     _lowSpeedStartTime = null;
+    _lastAccuratePositionAt = null;
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
