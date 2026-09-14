@@ -25,6 +25,7 @@ class WalkTrackingState {
   final String? error;
   final double elevationGainMeters;
   final double currentGradePercent;
+  final bool hasRecentGrade;
   final double currentAltitude;
 
   const WalkTrackingState({
@@ -40,6 +41,7 @@ class WalkTrackingState {
     this.error,
     this.elevationGainMeters = 0,
     this.currentGradePercent = 0,
+    this.hasRecentGrade = false,
     this.currentAltitude = 0,
   });
 
@@ -56,6 +58,7 @@ class WalkTrackingState {
     String? error,
     double? elevationGainMeters,
     double? currentGradePercent,
+    bool? hasRecentGrade,
     double? currentAltitude,
   }) {
     final manualPaused = isManuallyPaused ?? this.isManuallyPaused;
@@ -78,6 +81,7 @@ class WalkTrackingState {
           elevationGainMeters ?? this.elevationGainMeters,
       currentGradePercent:
           currentGradePercent ?? this.currentGradePercent,
+      hasRecentGrade: hasRecentGrade ?? this.hasRecentGrade,
       currentAltitude: currentAltitude ?? this.currentAltitude,
     );
   }
@@ -106,6 +110,12 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   static const Duration autoPauseDelay = Duration(seconds: 20);
   static const Duration noLocationAutoPauseDelay = Duration(seconds: 30);
 
+  // Güncel eğim eşikleri (son ~20m yuvarlanan mesafe)
+  static const double gradeMinDistance = 15.0;
+  static const double gradeTargetDistance = 20.0;
+  static const double gradeMaxDistance = 30.0;
+  static const Duration gradeStaleAfter = Duration(seconds: 20);
+
   DateTime? _lowSpeedStartTime;
   DateTime? _lastAccuratePositionAt;
   int _consecutiveResumePoints = 0;
@@ -119,6 +129,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   double _climbingDistanceMeters = 0;
   double? _maxAltitude;
   final List<double> _altitudeBuffer = [];
+  final List<_AltitudeSample> _altitudeSamples = [];
+  DateTime? _lastGradeAt;
   final List<RoutePoint> _recorded = [];
 
   int get _currentMovingSeconds {
@@ -235,8 +247,12 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       if (!state.isTracking) return;
 
       if (!state.isPaused) {
+        final isGradeStale = _lastGradeAt == null ||
+            DateTime.now().difference(_lastGradeAt!) >= gradeStaleAfter;
+
         state = state.copyWith(
           elapsed: Duration(seconds: _currentMovingSeconds),
+          hasRecentGrade: isGradeStale ? false : state.hasRecentGrade,
         );
 
         _checkAutoPauseTimeout();
@@ -282,6 +298,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastAltitudePos = null;
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
+    _altitudeSamples.clear();
+    _lastGradeAt = null;
 
     _lowSpeedStartTime = null;
     _lastAccuratePositionAt = null;
@@ -294,6 +312,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       isAutoPaused: true,
       isManuallyPaused: false,
       currentGradePercent: 0,
+      hasRecentGrade: false,
       elapsed: Duration(
         seconds: _accumulatedMovingSeconds,
       ),
@@ -347,6 +366,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastAltitudePos = null;
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
+    _altitudeSamples.clear();
+    _lastGradeAt = null;
     _lowSpeedStartTime = null;
     _lastAccuratePositionAt = null;
     _consecutiveResumePoints = 0;
@@ -361,6 +382,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       isManuallyPaused: true,
       isAutoPaused: false,
       currentGradePercent: 0,
+      hasRecentGrade: false,
       elapsed: Duration(seconds: _accumulatedMovingSeconds),
     );
 
@@ -384,6 +406,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lastAltitudePos = null;
     _lastValidAltitude = null;
     _altitudeBuffer.clear();
+    _altitudeSamples.clear();
+    _lastGradeAt = null;
     _lowSpeedStartTime = null;
     _lastAccuratePositionAt = DateTime.now();
     _consecutiveResumePoints = 0;
@@ -397,6 +421,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       isPaused: false,
       isManuallyPaused: false,
       isAutoPaused: false,
+      hasRecentGrade: false,
       hasRecoveredSession: false,
       error: null,
     );
@@ -495,6 +520,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           _lastAltitudePos = null;
           _lastValidAltitude = null;
           _altitudeBuffer.clear();
+          _altitudeSamples.clear();
+          _lastGradeAt = null;
 
           _recorded.addAll(_pendingResumePoints);
 
@@ -502,6 +529,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
             isPaused: false,
             isAutoPaused: false,
             isManuallyPaused: false,
+            hasRecentGrade: false,
             points: [
               ...state.points,
               ..._pendingResumePoints.map(
@@ -602,6 +630,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     final hasAccurateAltitude =
         pos.altitudeAccuracy > 0 && pos.altitudeAccuracy <= 15.0;
     double newGrade = state.currentGradePercent;
+    bool newHasRecentGrade = state.hasRecentGrade;
     double currentDisplayAlt = state.currentAltitude;
 
     if (acceptPoint && hasAccurateAltitude) {
@@ -630,19 +659,55 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         if (altDiff >= 1.5 && hDist >= 5.0) {
           _totalElevationGain += altDiff;
           _climbingDistanceMeters += hDist;
-          newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
           _lastAltitudePos = pos;
           _lastValidAltitude = smoothedAlt;
         } else if (altDiff <= -1.5 && hDist >= 5.0) {
-          newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
           _lastAltitudePos = pos;
           _lastValidAltitude = smoothedAlt;
         } else if (hDist >= 25.0) {
-          newGrade = ((altDiff / hDist) * 100).clamp(-30.0, 30.0);
           _lastAltitudePos = pos;
           _lastValidAltitude = smoothedAlt;
         }
       }
+
+      // Son ~20 metreye dayalı güncel eğim (rolling distance grade) hesabı:
+      final currentDistance = state.distanceMeters + added;
+      _altitudeSamples.add(_AltitudeSample(
+        altitude: smoothedAlt,
+        distanceMeters: currentDistance,
+        timestamp: pos.timestamp,
+      ));
+
+      _altitudeSamples.removeWhere(
+        (s) => (currentDistance - s.distanceMeters) > (gradeMaxDistance + 15.0),
+      );
+
+      _AltitudeSample? bestSample;
+      double bestDelta = double.infinity;
+
+      for (final s in _altitudeSamples) {
+        final dist = currentDistance - s.distanceMeters;
+        if (dist >= gradeMinDistance && dist <= gradeMaxDistance) {
+          final delta = (dist - gradeTargetDistance).abs();
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            bestSample = s;
+          }
+        }
+      }
+
+      if (bestSample != null) {
+        final dist = currentDistance - bestSample.distanceMeters;
+        final altDiff = smoothedAlt - bestSample.altitude;
+        newGrade = ((altDiff / dist) * 100).clamp(-30.0, 30.0);
+        newHasRecentGrade = true;
+        _lastGradeAt = DateTime.now();
+      }
+    }
+
+    if (_lastGradeAt == null ||
+        DateTime.now().difference(_lastGradeAt!) >= gradeStaleAfter) {
+      newHasRecentGrade = false;
     }
 
     state = state.copyWith(
@@ -652,6 +717,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       distanceMeters: state.distanceMeters + added,
       elevationGainMeters: _totalElevationGain,
       currentGradePercent: newGrade,
+      hasRecentGrade: newHasRecentGrade,
       currentAltitude: currentDisplayAlt,
     );
   }
@@ -748,6 +814,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _isSwitchingGpsMode = false;
 
     _altitudeBuffer.clear();
+    _altitudeSamples.clear();
+    _lastGradeAt = null;
     _recorded.clear();
   }
 
@@ -777,3 +845,15 @@ final walkHistoryProvider = StreamProvider<List<WalkSession>>((ref) {
           ),
       );
 });
+
+class _AltitudeSample {
+  final double altitude;
+  final double distanceMeters;
+  final DateTime timestamp;
+
+  const _AltitudeSample({
+    required this.altitude,
+    required this.distanceMeters,
+    required this.timestamp,
+  });
+}

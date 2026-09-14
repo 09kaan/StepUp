@@ -70,6 +70,10 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
       return "$m'${s.toString().padLeft(2, '0')}\"/km";
     }();
 
+    final gradeText = state.isPaused || !state.hasRecentGrade
+        ? '-'
+        : '%${state.currentGradePercent.toStringAsFixed(1)}';
+
     final center = mapPoints.isNotEmpty
         ? mapPoints.last
         : const LatLng(41.0082, 28.9784);
@@ -300,9 +304,8 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
                     ),
                     Expanded(
                       child: _WalkStat(
-                        value:
-                            '%${state.currentGradePercent.toStringAsFixed(0)}',
-                        label: 'Anlık Eğim',
+                        value: gradeText,
+                        label: 'Güncel Eğim',
                       ),
                     ),
                   ],
