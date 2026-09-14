@@ -268,20 +268,15 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       return;
     }
 
-    final lowSpeedStart = _lowSpeedStartTime;
-
-    if (lowSpeedStart == null) {
+    if (_lowSpeedStartTime == null) {
       return;
     }
 
     if (_lastResumeAt != null) {
-      final movingUntilStopped =
-          lowSpeedStart.difference(_lastResumeAt!).inSeconds;
+      final activeSeconds =
+          DateTime.now().difference(_lastResumeAt!).inSeconds;
 
-      _accumulatedMovingSeconds += movingUntilStopped.clamp(
-        0,
-        DateTime.now().difference(_lastResumeAt!).inSeconds,
-      );
+      _accumulatedMovingSeconds += activeSeconds;
     }
 
     _lastResumeAt = null;
