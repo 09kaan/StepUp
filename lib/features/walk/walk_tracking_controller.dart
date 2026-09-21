@@ -342,16 +342,29 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
     final stepsInWindow = currentSteps - _autoPauseStepBaseline!;
     if (stepsInWindow >= 6) {
+      final resumeStartedAt = _autoPauseStepStartedAt ?? now;
       await _resumeFromAutoPause(
         resumeSteps: stepsInWindow,
+        resumeStartedAt: resumeStartedAt,
       );
     }
   }
 
-  Future<void> _resumeFromAutoPause({int resumeSteps = 0}) async {
+  Future<void> _resumeFromAutoPause({
+    int resumeSteps = 0,
+    DateTime? resumeStartedAt,
+  }) async {
     if (!state.isAutoPaused || _activeSession == null) {
       return;
     }
+
+    final now = DateTime.now();
+    final movementStartedAt = resumeStartedAt ?? now;
+    final resumeDurationSeconds = now
+        .difference(movementStartedAt)
+        .inSeconds
+        .clamp(0, 10);
+    _accumulatedMovingSeconds += resumeDurationSeconds;
 
     final safeResumeSteps = resumeSteps.clamp(0, 15);
     final resumeDistance = safeResumeSteps * _estimatedStrideMeters;
@@ -360,17 +373,18 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _lowSpeedStartTime = null;
     _autoPauseStepBaseline = null;
     _autoPauseStepStartedAt = null;
-    _lastAccuratePositionAt = DateTime.now();
-    _lastResumeAt = DateTime.now();
+    _lastAccuratePositionAt = null;
+    _lastResumeAt = now;
 
     state = state.copyWith(
       isTracking: true,
       isPaused: false,
       isAutoPaused: false,
       isManuallyPaused: false,
+      elapsed: Duration(seconds: _accumulatedMovingSeconds),
       distanceMeters: state.distanceMeters + resumeDistance,
       hasRecentGrade: false,
-      hasGpsSignal: true,
+      hasGpsSignal: false,
       error: null,
     );
 
