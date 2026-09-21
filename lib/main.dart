@@ -36,7 +36,7 @@ Future<void> main() async {
 
   await NotificationService.instance.init();
   await NotificationService.instance.requestPermissions();
-  await NotificationService.instance.scheduleDailyReminder(hour: 19, minute: 0);
+  await NotificationService.instance.syncReminderWithTodayActivity(isar, hour: 19, minute: 0);
 
   await HomeWidgetService.init();
 

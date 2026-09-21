@@ -9,6 +9,7 @@ import 'package:pedometer/pedometer.dart';
 import '../../main.dart'; // isarProvider
 import '../../models/walk_session.dart';
 import '../../services/location_tracking_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/step_service.dart';
 
 final locationServiceProvider =
@@ -1070,6 +1071,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     await isar.writeTxn(() async {
       await isar.walkSessions.put(session);
     });
+
+    unawaited(NotificationService.instance.syncReminderWithTodayActivity(isar));
 
     _resetController();
     state = const WalkTrackingState();

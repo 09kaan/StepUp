@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:intl/intl.dart';
 
+import '../../main.dart';
+import '../../services/notification_service.dart';
 import '../../services/suggestion_service.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../theme/app_theme.dart';
@@ -49,6 +51,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     ref.invalidate(todayActivityProvider);
     ref.invalidate(streakProvider);
     ref.invalidate(goalSuggestionProvider);
+    final isar = ref.read(isarProvider);
+    unawaited(NotificationService.instance.syncReminderWithTodayActivity(isar));
   }
 
   @override

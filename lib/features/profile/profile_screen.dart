@@ -103,7 +103,7 @@ class ProfileScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.notifications_active),
               title: const Text('Günlük hatırlatma (19:00)'),
-              subtitle: const Text('Her akşam yürüyüş hatırlatması'),
+              subtitle: const Text('Yürüyüş yapılmadıysa akşam 19:00\'da hatırlat'),
               trailing: TextButton(
                 onPressed: () async {
                   await NotificationService.instance.showTestNow();

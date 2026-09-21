@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:apple_maps_flutter/apple_maps_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../main.dart'; // isarProvider
 import '../../models/walk_session.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import 'services/gpx_export_service.dart';
 import 'widgets/duration_breakdown_card.dart';
@@ -244,6 +247,7 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
 
     final isar = ref.read(isarProvider);
     await isar.writeTxn(() => isar.walkSessions.delete(_session.id));
+    unawaited(NotificationService.instance.syncReminderWithTodayActivity(isar));
 
     if (mounted) {
       Navigator.pop(context);

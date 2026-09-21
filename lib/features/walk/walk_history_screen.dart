@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../main.dart'; // isarProvider
 import '../../models/walk_session.dart';
+import '../../services/notification_service.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../theme/app_theme.dart';
 import 'walk_detail_screen.dart';
@@ -340,6 +343,7 @@ Future<void> _confirmDeleteWalk(
 
   final isar = ref.read(isarProvider);
   await isar.writeTxn(() => isar.walkSessions.delete(session.id));
+  unawaited(NotificationService.instance.syncReminderWithTodayActivity(isar));
 
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
