@@ -74,6 +74,31 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
       final p2 = rawPoints[i];
 
       final d = Geolocator.distanceBetween(p1.lat, p1.lng, p2.lat, p2.lng);
+      final pt = LatLng(p2.lat, p2.lng);
+
+      // GPS Boşluğu / Işınlanma Filtresi: Uzun süreli kesintilerde veya mantıksız sıçramalarda
+      // araya düz çizgi çekmek yerine rotayı yeni bir parça olarak başlat.
+      final timeDelta = (p1.time != null && p2.time != null)
+          ? p2.time!.difference(p1.time!).inSeconds.abs()
+          : 0;
+      final isGap = (timeDelta > 45 && d > 30) || d > 200;
+
+      if (isGap) {
+        if (currentBatch.length >= 2 && currentColor != null) {
+          polylines.add(
+            Polyline(
+              polylineId: PolylineId('batch_${polylineIndex++}'),
+              points: List.of(currentBatch),
+              color: currentColor,
+              width: 5,
+            ),
+          );
+        }
+        currentBatch = [pt];
+        currentColor = null;
+        continue;
+      }
+
       final altDiff = smoothedAlts[i] - smoothedAlts[i - 1];
 
       // Gürültü Filtresi: Çok kısa mesafeler veya düşük dikey doğrulukta eğim 0 kabul edilir
@@ -97,8 +122,6 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
       } else {
         segmentColor = const Color(0xFFEF4444); // Dik Yokuş (Kırmızı)
       }
-
-      final pt = LatLng(p2.lat, p2.lng);
 
       if (currentColor == null) {
         currentColor = segmentColor;

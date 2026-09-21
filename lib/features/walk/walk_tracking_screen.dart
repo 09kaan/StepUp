@@ -54,6 +54,11 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
         .map((p) => LatLng(p.latitude, p.longitude))
         .toList();
 
+    final mapSegments = state.routeSegments
+        .map((segment) =>
+            segment.map((p) => LatLng(p.latitude, p.longitude)).toList())
+        .toList();
+
     final averageSpeedKmh =
         state.distanceMeters > 0 && state.elapsed.inSeconds > 0
             ? (state.distanceMeters / state.elapsed.inSeconds) * 3.6
@@ -106,16 +111,16 @@ class _WalkTrackingScreenState extends ConsumerState<WalkTrackingScreen>
                     trackingMode: state.isTracking
                         ? TrackingMode.follow
                         : TrackingMode.none,
-                    polylines: mapPoints.length >= 2
-                        ? {
-                            Polyline(
-                              polylineId: PolylineId('route'),
-                              points: mapPoints,
-                              color: Colors.blue,
-                              width: 5,
-                            ),
-                          }
-                        : <Polyline>{},
+                    polylines: {
+                      for (var i = 0; i < mapSegments.length; i++)
+                        if (mapSegments[i].length >= 2)
+                          Polyline(
+                            polylineId: PolylineId('route_$i'),
+                            points: mapSegments[i],
+                            color: Colors.blue,
+                            width: 5,
+                          ),
+                    },
                   ),
                   if (state.isPaused && !state.hasRecoveredSession)
                     Positioned(

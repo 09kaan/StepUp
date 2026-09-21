@@ -22,6 +22,7 @@ class WalkTrackingState {
   final bool isRestoring;
   final bool hasRecoveredSession;
   final List<LatLng> points;
+  final List<List<LatLng>> routeSegments;
   final double distanceMeters;
   final Duration elapsed;
   final String? error;
@@ -39,6 +40,7 @@ class WalkTrackingState {
     this.isRestoring = false,
     this.hasRecoveredSession = false,
     this.points = const [],
+    this.routeSegments = const [[]],
     this.distanceMeters = 0,
     this.elapsed = Duration.zero,
     this.error,
@@ -57,6 +59,7 @@ class WalkTrackingState {
     bool? isRestoring,
     bool? hasRecoveredSession,
     List<LatLng>? points,
+    List<List<LatLng>>? routeSegments,
     double? distanceMeters,
     Duration? elapsed,
     String? error,
@@ -79,6 +82,7 @@ class WalkTrackingState {
       hasRecoveredSession:
           hasRecoveredSession ?? this.hasRecoveredSession,
       points: points ?? this.points,
+      routeSegments: routeSegments ?? this.routeSegments,
       distanceMeters: distanceMeters ?? this.distanceMeters,
       elapsed: elapsed ?? this.elapsed,
       error: error,
@@ -143,6 +147,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
   // Pedometre ve GPS kesintisi mesafe tahmini değişkenleri
   int _latestStepCount = 0;
+  int _stepCountAtLastAccuratePosition = 0;
   DateTime? _lastStepAt;
   int? _autoPauseStepBaseline;
   DateTime? _autoPauseStepStartedAt;
@@ -193,6 +198,30 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           .map((p) => LatLng(p.lat, p.lng))
           .toList();
 
+      final List<List<LatLng>> restoredSegments = [];
+      if (session.points.isNotEmpty) {
+        List<LatLng> currentSeg = [
+          LatLng(session.points[0].lat, session.points[0].lng)
+        ];
+        for (int i = 1; i < session.points.length; i++) {
+          final p1 = session.points[i - 1];
+          final p2 = session.points[i];
+          final d = Geolocator.distanceBetween(p1.lat, p1.lng, p2.lat, p2.lng);
+          final timeDelta = (p1.time != null && p2.time != null)
+              ? p2.time!.difference(p1.time!).inSeconds.abs()
+              : 0;
+          final isGap = (timeDelta > 45 && d > 30) || d > 200;
+          final pt = LatLng(p2.lat, p2.lng);
+          if (isGap) {
+            restoredSegments.add(currentSeg);
+            currentSeg = [pt];
+          } else {
+            currentSeg.add(pt);
+          }
+        }
+        restoredSegments.add(currentSeg);
+      }
+
       state = WalkTrackingState(
         isTracking: false,
         isPaused: true,
@@ -201,6 +230,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         isRestoring: false,
         hasRecoveredSession: true,
         points: mapPoints,
+        routeSegments: restoredSegments.isNotEmpty ? restoredSegments : const [[]],
         distanceMeters: session.distanceMeters,
         elapsed: Duration(
           seconds: session.movingDurationSeconds,
@@ -248,6 +278,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _accumulatedMovingSeconds = 0;
     _lastResumeAt = DateTime.now();
     _lastAccuratePositionAt = DateTime.now();
+    _stepCountAtLastAccuratePosition = _latestStepCount;
     _gpsGap = null;
     _autoPauseStepBaseline = null;
     _autoPauseStepStartedAt = null;
@@ -286,18 +317,31 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   }
 
   Future<void> _handleStepCount(StepCount event) async {
+    final now = DateTime.now();
     final currentSteps = event.steps;
-    _lastStepAt = DateTime.now();
+    _lastStepAt = now;
     _latestStepCount = currentSteps;
 
     if (!state.isAutoPaused) return;
-    if (_autoPauseStepBaseline == null || _autoPauseStepStartedAt == null) return;
 
-    final stepsSincePause = currentSteps - _autoPauseStepBaseline!;
-    final elapsed = DateTime.now().difference(_autoPauseStepStartedAt!);
+    if (_autoPauseStepBaseline == null || _autoPauseStepStartedAt == null) {
+      _autoPauseStepBaseline = currentSteps;
+      _autoPauseStepStartedAt = now;
+      return;
+    }
 
-    // 10 saniye içinde en az 6 adım: kullanıcının tekrar yürüdüğüne dair güçlü kanıt.
-    if (stepsSincePause >= 6 && elapsed <= const Duration(seconds: 10)) {
+    final windowElapsed = now.difference(_autoPauseStepStartedAt!);
+
+    // Kullanıcı duraklamadan daha sonra yürümeye başlamış olabilir:
+    // 10 saniyelik pencere dolduysa yeni pencere aç ve baseline'ı güncelle.
+    if (windowElapsed > const Duration(seconds: 10)) {
+      _autoPauseStepBaseline = currentSteps;
+      _autoPauseStepStartedAt = now;
+      return;
+    }
+
+    final stepsInWindow = currentSteps - _autoPauseStepBaseline!;
+    if (stepsInWindow >= 6) {
       await _resumeFromAutoPause();
     }
   }
@@ -347,7 +391,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           _gpsGap = GpsGap(
             lastGoodPosition: _last!,
             startedAt: _lastAccuratePositionAt ?? now,
-            stepCountAtStart: _latestStepCount,
+            stepCountAtStart: _stepCountAtLastAccuratePosition,
           );
         }
 
@@ -596,6 +640,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     final isAccurate = pos.accuracy > 0 && pos.accuracy <= 20.0;
     if (isAccurate) {
       _lastAccuratePositionAt = DateTime.now();
+      _stepCountAtLastAccuratePosition = _latestStepCount;
     }
 
     // --- DURUM 1: OTOMATİK DURAKLATILMIŞ DURUMDA DEVAM ETME (AUTO-RESUME) KONTROLÜ ---
@@ -650,6 +695,16 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
           _recorded.addAll(_pendingResumePoints);
 
+          final resumeLatLngs =
+              _pendingResumePoints.map((p) => LatLng(p.lat, p.lng)).toList();
+          final List<List<LatLng>> updatedSegments = (state.routeSegments.isEmpty ||
+                  (state.routeSegments.length == 1 && state.routeSegments.first.isEmpty))
+              ? [resumeLatLngs]
+              : [
+                  ...state.routeSegments.sublist(0, state.routeSegments.length - 1),
+                  [...state.routeSegments.last, ...resumeLatLngs],
+                ];
+
           state = state.copyWith(
             isPaused: false,
             isAutoPaused: false,
@@ -658,10 +713,9 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
             hasGpsSignal: true,
             points: [
               ...state.points,
-              ..._pendingResumePoints.map(
-                (p) => LatLng(p.lat, p.lng),
-              ),
+              ...resumeLatLngs,
             ],
+            routeSegments: updatedSegments,
             distanceMeters:
                 state.distanceMeters + _pendingResumeDistance,
           );
@@ -710,23 +764,54 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       final stepDistance = gapSteps * _estimatedStrideMeters;
       final timeLimit = (gapSeconds > 0 ? gapSeconds : 1.0) * 2.5;
 
-      final gpsLowerBound = (directDistance -
+      final rawGpsLowerBound = (directDistance -
               gap.lastGoodPosition.accuracy -
               pos.accuracy)
           .clamp(0.0, double.infinity);
 
+      final directDistanceIsPlausible = directDistance <=
+          (timeLimit + gap.lastGoodPosition.accuracy + pos.accuracy);
+
+      final safeGpsLowerBound = directDistanceIsPlausible
+          ? rawGpsLowerBound.clamp(0.0, timeLimit)
+          : 0.0;
+
       double estimatedGapDistance;
       if (gapSteps > 0) {
-        estimatedGapDistance = stepDistance.clamp(gpsLowerBound, timeLimit);
+        estimatedGapDistance =
+            stepDistance.clamp(safeGpsLowerBound, timeLimit);
       } else {
-        estimatedGapDistance = gpsLowerBound.clamp(0.0, timeLimit);
+        estimatedGapDistance = safeGpsLowerBound;
       }
 
       // Yeni GPS sabitlemesi (anchor): Bu noktayı yeni başlangıç noktası yap
       _last = pos;
       _lowSpeedStartTime = null;
 
+      _recorded.add(RoutePoint.of(
+        pos.latitude,
+        pos.longitude,
+        pos.timestamp,
+        pos.altitude,
+        pos.altitudeAccuracy,
+        _currentMovingSeconds,
+      ));
+
+      final pt = LatLng(pos.latitude, pos.longitude);
+      final List<List<LatLng>> updatedSegments;
+      if (state.routeSegments.isEmpty ||
+          (state.routeSegments.length == 1 && state.routeSegments.first.isEmpty)) {
+        updatedSegments = [[pt]];
+      } else {
+        updatedSegments = [
+          ...state.routeSegments,
+          [pt],
+        ];
+      }
+
       state = state.copyWith(
+        points: [...state.points, pt],
+        routeSegments: updatedSegments,
         distanceMeters: state.distanceMeters + estimatedGapDistance,
         hasGpsSignal: true,
       );
@@ -882,10 +967,26 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       newHasRecentGrade = false;
     }
 
+    final pt = LatLng(pos.latitude, pos.longitude);
+    List<List<LatLng>>? newSegments;
+    if (acceptPoint) {
+      if (state.routeSegments.isEmpty ||
+          (state.routeSegments.length == 1 && state.routeSegments.first.isEmpty)) {
+        newSegments = [[pt]];
+      } else {
+        final lastSeg = List<LatLng>.from(state.routeSegments.last)..add(pt);
+        newSegments = [
+          ...state.routeSegments.sublist(0, state.routeSegments.length - 1),
+          lastSeg,
+        ];
+      }
+    }
+
     state = state.copyWith(
       points: acceptPoint
-          ? [...state.points, LatLng(pos.latitude, pos.longitude)]
+          ? [...state.points, pt]
           : state.points,
+      routeSegments: newSegments ?? state.routeSegments,
       distanceMeters: state.distanceMeters + added,
       elevationGainMeters: _totalElevationGain,
       currentGradePercent: newGrade,
@@ -990,6 +1091,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _autoPauseStepBaseline = null;
     _autoPauseStepStartedAt = null;
     _lastStepAt = null;
+    _stepCountAtLastAccuratePosition = 0;
     _gpsPowerMode = GpsPowerMode.active;
     _isSwitchingGpsMode = false;
 
