@@ -1942,8 +1942,13 @@ const RoutePointSchema = Schema(
       name: r'movingSeconds',
       type: IsarType.long,
     ),
-    r'time': PropertySchema(
+    r'startsNewSegment': PropertySchema(
       id: 5,
+      name: r'startsNewSegment',
+      type: IsarType.bool,
+    ),
+    r'time': PropertySchema(
+      id: 6,
       name: r'time',
       type: IsarType.dateTime,
     )
@@ -1974,7 +1979,8 @@ void _routePointSerialize(
   writer.writeDouble(offsets[2], object.lat);
   writer.writeDouble(offsets[3], object.lng);
   writer.writeLong(offsets[4], object.movingSeconds);
-  writer.writeDateTime(offsets[5], object.time);
+  writer.writeBool(offsets[5], object.startsNewSegment);
+  writer.writeDateTime(offsets[6], object.time);
 }
 
 RoutePoint _routePointDeserialize(
@@ -1989,7 +1995,8 @@ RoutePoint _routePointDeserialize(
   object.lat = reader.readDouble(offsets[2]);
   object.lng = reader.readDouble(offsets[3]);
   object.movingSeconds = reader.readLong(offsets[4]);
-  object.time = reader.readDateTimeOrNull(offsets[5]);
+  object.startsNewSegment = reader.readBool(offsets[5]);
+  object.time = reader.readDateTimeOrNull(offsets[6]);
   return object;
 }
 
@@ -2011,6 +2018,8 @@ P _routePointDeserializeProp<P>(
     case 4:
       return (reader.readLong(offset)) as P;
     case 5:
+      return (reader.readBool(offset)) as P;
+    case 6:
       return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2324,6 +2333,16 @@ extension RoutePointQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<RoutePoint, RoutePoint, QAfterFilterCondition>
+      startsNewSegmentEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'startsNewSegment',
+        value: value,
       ));
     });
   }

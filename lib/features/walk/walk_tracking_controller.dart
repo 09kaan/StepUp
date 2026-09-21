@@ -210,7 +210,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           final timeDelta = (p1.time != null && p2.time != null)
               ? p2.time!.difference(p1.time!).inSeconds.abs()
               : 0;
-          final isGap = (timeDelta > 45 && d > 30) || d > 200;
+          final isGap = p2.startsNewSegment || (timeDelta > 45 && d > 30) || d > 200;
           final pt = LatLng(p2.lat, p2.lng);
           if (isGap) {
             restoredSegments.add(currentSeg);
@@ -342,14 +342,19 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
     final stepsInWindow = currentSteps - _autoPauseStepBaseline!;
     if (stepsInWindow >= 6) {
-      await _resumeFromAutoPause();
+      await _resumeFromAutoPause(
+        resumeSteps: stepsInWindow,
+      );
     }
   }
 
-  Future<void> _resumeFromAutoPause() async {
+  Future<void> _resumeFromAutoPause({int resumeSteps = 0}) async {
     if (!state.isAutoPaused || _activeSession == null) {
       return;
     }
+
+    final safeResumeSteps = resumeSteps.clamp(0, 15);
+    final resumeDistance = safeResumeSteps * _estimatedStrideMeters;
 
     _last = null;
     _lowSpeedStartTime = null;
@@ -363,6 +368,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       isPaused: false,
       isAutoPaused: false,
       isManuallyPaused: false,
+      distanceMeters: state.distanceMeters + resumeDistance,
       hasRecentGrade: false,
       hasGpsSignal: true,
       error: null,
@@ -795,6 +801,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         pos.altitude,
         pos.altitudeAccuracy,
         _currentMovingSeconds,
+        true,
       ));
 
       final pt = LatLng(pos.latitude, pos.longitude);
@@ -822,11 +829,13 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     double added = 0;
     bool acceptPoint = false;
     double currentSpeed = 0.0;
+    bool isSegmentStart = false;
 
     if (_last == null) {
       if (isAccurate) {
         _last = pos;
         acceptPoint = true;
+        isSegmentStart = _recorded.isNotEmpty;
       }
     } else {
       final dist = service.distanceBetween(
@@ -880,6 +889,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
         pos.altitude,
         pos.altitudeAccuracy,
         _currentMovingSeconds,
+        isSegmentStart,
       ));
     }
 
@@ -970,7 +980,12 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     final pt = LatLng(pos.latitude, pos.longitude);
     List<List<LatLng>>? newSegments;
     if (acceptPoint) {
-      if (state.routeSegments.isEmpty ||
+      if (isSegmentStart) {
+        newSegments = [
+          ...state.routeSegments,
+          [pt],
+        ];
+      } else if (state.routeSegments.isEmpty ||
           (state.routeSegments.length == 1 && state.routeSegments.first.isEmpty)) {
         newSegments = [[pt]];
       } else {

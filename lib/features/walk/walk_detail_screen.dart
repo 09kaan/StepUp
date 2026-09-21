@@ -81,7 +81,7 @@ class _WalkDetailScreenState extends ConsumerState<WalkDetailScreen> {
       final timeDelta = (p1.time != null && p2.time != null)
           ? p2.time!.difference(p1.time!).inSeconds.abs()
           : 0;
-      final isGap = (timeDelta > 45 && d > 30) || d > 200;
+      final isGap = p2.startsNewSegment || (timeDelta > 45 && d > 30) || d > 200;
 
       if (isGap) {
         if (currentBatch.length >= 2 && currentColor != null) {
