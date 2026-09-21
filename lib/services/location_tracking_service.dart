@@ -39,12 +39,10 @@ class LocationTrackingService {
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return AppleSettings(
-        accuracy: isAutoPaused
-            ? LocationAccuracy.medium
-            : LocationAccuracy.high,
+        accuracy: LocationAccuracy.high,
         activityType: ActivityType.fitness,
-        distanceFilter: isAutoPaused ? 20 : 10,
-        pauseLocationUpdatesAutomatically: isAutoPaused,
+        distanceFilter: isAutoPaused ? 8 : 5,
+        pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
         allowBackgroundLocationUpdates: true,
       );

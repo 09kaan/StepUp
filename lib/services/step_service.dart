@@ -1,5 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+final stepServiceProvider = Provider((ref) => StepService());
 
 /// Cihazın adım sensöründen canlı veri sağlar.
 class StepService {

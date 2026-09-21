@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:isar/isar.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:pedometer/pedometer.dart';
 
 import '../../main.dart'; // isarProvider
 import '../../models/walk_session.dart';
 import '../../services/location_tracking_service.dart';
+import '../../services/step_service.dart';
 
 final locationServiceProvider =
     Provider((ref) => LocationTrackingService());
@@ -26,6 +28,7 @@ class WalkTrackingState {
   final double elevationGainMeters;
   final double currentGradePercent;
   final bool hasRecentGrade;
+  final bool hasGpsSignal;
   final double currentAltitude;
 
   const WalkTrackingState({
@@ -42,6 +45,7 @@ class WalkTrackingState {
     this.elevationGainMeters = 0,
     this.currentGradePercent = 0,
     this.hasRecentGrade = false,
+    this.hasGpsSignal = true,
     this.currentAltitude = 0,
   });
 
@@ -59,6 +63,7 @@ class WalkTrackingState {
     double? elevationGainMeters,
     double? currentGradePercent,
     bool? hasRecentGrade,
+    bool? hasGpsSignal,
     double? currentAltitude,
   }) {
     final manualPaused = isManuallyPaused ?? this.isManuallyPaused;
@@ -82,6 +87,7 @@ class WalkTrackingState {
       currentGradePercent:
           currentGradePercent ?? this.currentGradePercent,
       hasRecentGrade: hasRecentGrade ?? this.hasRecentGrade,
+      hasGpsSignal: hasGpsSignal ?? this.hasGpsSignal,
       currentAltitude: currentAltitude ?? this.currentAltitude,
     );
   }
@@ -94,6 +100,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
   final Ref _ref;
   StreamSubscription<Position>? _sub;
+  StreamSubscription<StepCount>? _stepSub;
+  StreamSubscription<PedestrianStatus>? _pedestrianSub;
   Timer? _timer;
   Timer? _checkpointTimer;
 
@@ -132,6 +140,14 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
   final List<_AltitudeSample> _altitudeSamples = [];
   DateTime? _lastGradeAt;
   final List<RoutePoint> _recorded = [];
+
+  // Pedometre ve GPS kesintisi mesafe tahmini değişkenleri
+  int _latestStepCount = 0;
+  DateTime? _lastStepAt;
+  int? _autoPauseStepBaseline;
+  DateTime? _autoPauseStepStartedAt;
+  GpsGap? _gpsGap;
+  double _estimatedStrideMeters = 0.72;
 
   int get _currentMovingSeconds {
     if (_lastResumeAt == null) {
@@ -232,12 +248,84 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _accumulatedMovingSeconds = 0;
     _lastResumeAt = DateTime.now();
     _lastAccuratePositionAt = DateTime.now();
+    _gpsGap = null;
+    _autoPauseStepBaseline = null;
+    _autoPauseStepStartedAt = null;
+    _lastStepAt = null;
 
     state = const WalkTrackingState(isTracking: true);
 
+    _subscribePedometer();
     _startCheckpointTimer();
     _startElapsedTimer();
     await _setGpsPowerMode(GpsPowerMode.active);
+  }
+
+  void _subscribePedometer() {
+    _stepSub?.cancel();
+    _pedestrianSub?.cancel();
+
+    try {
+      final stepService = _ref.read(stepServiceProvider);
+      _stepSub = stepService.stepCountStream.listen(
+        _handleStepCount,
+        onError: (_) {},
+        cancelOnError: false,
+      );
+
+      _pedestrianSub = stepService.pedestrianStatusStream.listen(
+        (status) {
+          if (status.status == 'walking') {
+            _lastStepAt = DateTime.now();
+          }
+        },
+        onError: (_) {},
+        cancelOnError: false,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _handleStepCount(StepCount event) async {
+    final currentSteps = event.steps;
+    _lastStepAt = DateTime.now();
+    _latestStepCount = currentSteps;
+
+    if (!state.isAutoPaused) return;
+    if (_autoPauseStepBaseline == null || _autoPauseStepStartedAt == null) return;
+
+    final stepsSincePause = currentSteps - _autoPauseStepBaseline!;
+    final elapsed = DateTime.now().difference(_autoPauseStepStartedAt!);
+
+    // 10 saniye içinde en az 6 adım: kullanıcının tekrar yürüdüğüne dair güçlü kanıt.
+    if (stepsSincePause >= 6 && elapsed <= const Duration(seconds: 10)) {
+      await _resumeFromAutoPause();
+    }
+  }
+
+  Future<void> _resumeFromAutoPause() async {
+    if (!state.isAutoPaused || _activeSession == null) {
+      return;
+    }
+
+    _last = null;
+    _lowSpeedStartTime = null;
+    _autoPauseStepBaseline = null;
+    _autoPauseStepStartedAt = null;
+    _lastAccuratePositionAt = DateTime.now();
+    _lastResumeAt = DateTime.now();
+
+    state = state.copyWith(
+      isTracking: true,
+      isPaused: false,
+      isAutoPaused: false,
+      isManuallyPaused: false,
+      hasRecentGrade: false,
+      hasGpsSignal: true,
+      error: null,
+    );
+
+    await _setGpsPowerMode(GpsPowerMode.active);
+    await checkpoint();
   }
 
   void _startElapsedTimer() {
@@ -247,12 +335,26 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       if (!state.isTracking) return;
 
       if (!state.isPaused) {
+        final now = DateTime.now();
         final isGradeStale = _lastGradeAt == null ||
-            DateTime.now().difference(_lastGradeAt!) >= gradeStaleAfter;
+            now.difference(_lastGradeAt!) >= gradeStaleAfter;
+
+        final hasGps = _lastAccuratePositionAt != null &&
+            now.difference(_lastAccuratePositionAt!) < noLocationAutoPauseDelay;
+
+        // GPS kesintisi başladığında boşluk (gap) kaydını başlat
+        if (!hasGps && _gpsGap == null && _last != null) {
+          _gpsGap = GpsGap(
+            lastGoodPosition: _last!,
+            startedAt: _lastAccuratePositionAt ?? now,
+            stepCountAtStart: _latestStepCount,
+          );
+        }
 
         state = state.copyWith(
           elapsed: Duration(seconds: _currentMovingSeconds),
           hasRecentGrade: isGradeStale ? false : state.hasRecentGrade,
+          hasGpsSignal: hasGps,
         );
 
         _checkAutoPauseTimeout();
@@ -268,16 +370,26 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     }
 
     final now = DateTime.now();
-    final lowSpeedExpired = _lowSpeedStartTime != null &&
-        now.difference(_lowSpeedStartTime!) >= autoPauseDelay;
-    final noLocationUpdateExpired = _lastAccuratePositionAt != null &&
-        now.difference(_lastAccuratePositionAt!) >= noLocationAutoPauseDelay;
 
-    if (!lowSpeedExpired && !noLocationUpdateExpired) {
+    // Pedometre güvenliği: Son 20 saniyede adım atıldıysa kullanıcı hareket halindedir.
+    final hasRecentSteps = _lastStepAt != null &&
+        now.difference(_lastStepAt!) < const Duration(seconds: 20);
+
+    if (hasRecentSteps) {
+      _lowSpeedStartTime = null;
       return;
     }
 
-    unawaited(_triggerAutoPause());
+    final lowSpeedExpired = _lowSpeedStartTime != null &&
+        now.difference(_lowSpeedStartTime!) >= autoPauseDelay;
+
+    // GPS yoksa / eskiyse duraklatma kararı vermiyoruz!
+    final hasRecentAccurateLocation = _lastAccuratePositionAt != null &&
+        now.difference(_lastAccuratePositionAt!) < noLocationAutoPauseDelay;
+
+    if (hasRecentAccurateLocation && lowSpeedExpired) {
+      unawaited(_triggerAutoPause());
+    }
   }
 
   Future<void> _triggerAutoPause() async {
@@ -306,6 +418,11 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
+    _gpsGap = null;
+
+    // Adım sayacıyla otomatik devam başlangıç referansları
+    _autoPauseStepBaseline = _latestStepCount;
+    _autoPauseStepStartedAt = DateTime.now();
 
     state = state.copyWith(
       isPaused: true,
@@ -413,6 +530,9 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
+    _gpsGap = null;
+    _autoPauseStepBaseline = null;
+    _autoPauseStepStartedAt = null;
 
     _lastResumeAt = DateTime.now();
 
@@ -422,9 +542,12 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
       isManuallyPaused: false,
       isAutoPaused: false,
       hasRecentGrade: false,
+      hasGpsSignal: true,
       hasRecoveredSession: false,
       error: null,
     );
+
+    _subscribePedometer();
 
     _startElapsedTimer();
     _startCheckpointTimer();
@@ -516,6 +639,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           _lowSpeedStartTime = null;
           _lastResumeAt = DateTime.now();
           _lastAccuratePositionAt = DateTime.now();
+          _autoPauseStepBaseline = null;
+          _autoPauseStepStartedAt = null;
 
           _lastAltitudePos = null;
           _lastValidAltitude = null;
@@ -530,6 +655,7 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
             isAutoPaused: false,
             isManuallyPaused: false,
             hasRecentGrade: false,
+            hasGpsSignal: true,
             points: [
               ...state.points,
               ..._pendingResumePoints.map(
@@ -558,6 +684,52 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
           _last = pos;
         }
       }
+      return;
+    }
+
+    // --- DURUM 2: NORMAL TAKİP & OTOMATİK DURAKLATMA (AUTO-PAUSE) KONTROLÜ ---
+    // GPS kesintisinden sonraki ilk doğru nokta:
+    // GPS boşluğundaki mesafeyi adım + doğrudan mesafe + süre kontrolüyle tahmin et
+    if (isAccurate && _gpsGap != null) {
+      final gap = _gpsGap!;
+      _gpsGap = null;
+
+      final gapSteps = (_latestStepCount > gap.stepCountAtStart)
+          ? (_latestStepCount - gap.stepCountAtStart)
+          : 0;
+      final gapSeconds =
+          pos.timestamp.difference(gap.startedAt).inMilliseconds / 1000.0;
+
+      final directDistance = service.distanceBetween(
+        gap.lastGoodPosition.latitude,
+        gap.lastGoodPosition.longitude,
+        pos.latitude,
+        pos.longitude,
+      );
+
+      final stepDistance = gapSteps * _estimatedStrideMeters;
+      final timeLimit = (gapSeconds > 0 ? gapSeconds : 1.0) * 2.5;
+
+      final gpsLowerBound = (directDistance -
+              gap.lastGoodPosition.accuracy -
+              pos.accuracy)
+          .clamp(0.0, double.infinity);
+
+      double estimatedGapDistance;
+      if (gapSteps > 0) {
+        estimatedGapDistance = stepDistance.clamp(gpsLowerBound, timeLimit);
+      } else {
+        estimatedGapDistance = gpsLowerBound.clamp(0.0, timeLimit);
+      }
+
+      // Yeni GPS sabitlemesi (anchor): Bu noktayı yeni başlangıç noktası yap
+      _last = pos;
+      _lowSpeedStartTime = null;
+
+      state = state.copyWith(
+        distanceMeters: state.distanceMeters + estimatedGapDistance,
+        hasGpsSignal: true,
+      );
       return;
     }
 
@@ -792,10 +964,14 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _checkpointTimer?.cancel();
     _timer?.cancel();
     _sub?.cancel();
+    _stepSub?.cancel();
+    _pedestrianSub?.cancel();
 
     _checkpointTimer = null;
     _timer = null;
     _sub = null;
+    _stepSub = null;
+    _pedestrianSub = null;
     _activeSession = null;
     _last = null;
     _lastAltitudePos = null;
@@ -810,6 +986,10 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
     _consecutiveResumePoints = 0;
     _pendingResumeDistance = 0;
     _pendingResumePoints.clear();
+    _gpsGap = null;
+    _autoPauseStepBaseline = null;
+    _autoPauseStepStartedAt = null;
+    _lastStepAt = null;
     _gpsPowerMode = GpsPowerMode.active;
     _isSwitchingGpsMode = false;
 
@@ -821,6 +1001,8 @@ class WalkTrackingController extends StateNotifier<WalkTrackingState> {
 
   @override
   void dispose() {
+    _stepSub?.cancel();
+    _pedestrianSub?.cancel();
     _checkpointTimer?.cancel();
     _timer?.cancel();
     _sub?.cancel();
@@ -855,5 +1037,17 @@ class _AltitudeSample {
     required this.altitude,
     required this.distanceMeters,
     required this.timestamp,
+  });
+}
+
+class GpsGap {
+  final Position lastGoodPosition;
+  final DateTime startedAt;
+  final int stepCountAtStart;
+
+  const GpsGap({
+    required this.lastGoodPosition,
+    required this.startedAt,
+    required this.stepCountAtStart,
   });
 }
